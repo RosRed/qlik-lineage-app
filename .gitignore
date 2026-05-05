@@ -5,3 +5,4 @@ server/data/
 .env
 dist/
 *.db
+README1.md
