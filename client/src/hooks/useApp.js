@@ -11,7 +11,8 @@ export function useApp() {
 
   const {
     selectedApp, setSelectedApp, script, setScript,
-    analysis, analyzing, selectApp, clearApp, saveAndAnalyze
+    analysis, analyzing, analyzeMode, setAnalyzeMode,
+    selectApp, clearApp, saveAndAnalyze
   } = useAppData();
 
   // renameApp syncs both the list and the selectedApp if it's the one being renamed
@@ -28,6 +29,7 @@ export function useApp() {
 
   return {
     apps, selectedApp, script, analysis, analyzing, loadingApps,
+    analyzeMode, setAnalyzeMode,
     setScript, loadApps, selectApp, createApp, renameApp, deleteApp, saveAndAnalyze
   };
 }

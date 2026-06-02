@@ -20,6 +20,8 @@ export const appsApi = {
   saveScript:  (id, content, filename) => post(`${BASE}/apps/${id}/scripts`, { content, filename }),
   getScript:   (id)         => fetch(`${BASE}/apps/${id}/scripts`).then(json),
 
-  analyze:     (id)         => fetch(`${BASE}/apps/${id}/analyze`, { method: 'POST' }).then(json),
+  analyze:     (id, mode)   => post(`${BASE}/apps/${id}/analyze`, { mode: mode || 'claude' }),
   getAnalysis: (id)         => fetch(`${BASE}/apps/${id}/analysis`).then(json),
+
+  getUsage:    ()           => fetch(`${BASE}/usage`).then(json),
 };

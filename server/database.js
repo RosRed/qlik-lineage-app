@@ -34,6 +34,8 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     app_id INTEGER REFERENCES apps(id) ON DELETE CASCADE,
     result JSON,
+    script_hash TEXT,
+    analyze_mode TEXT DEFAULT 'claude',
     analyzed_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -43,8 +45,29 @@ db.exec(`
     role TEXT CHECK(role IN ('user','assistant')),
     content TEXT,
     mode TEXT,
+    source TEXT DEFAULT 'claude',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS api_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    model TEXT,
+    input_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    estimated_cost_cents INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+// Migrations pour les colonnes ajoutées aux tables existantes
+const migrations = [
+  'ALTER TABLE analyses ADD COLUMN script_hash TEXT',
+  'ALTER TABLE analyses ADD COLUMN analyze_mode TEXT DEFAULT \'claude\'',
+  'ALTER TABLE chat_messages ADD COLUMN source TEXT DEFAULT \'claude\'',
+];
+for (const sql of migrations) {
+  try { db.exec(sql); } catch (_) { /* colonne déjà présente */ }
+}
 
 module.exports = db;

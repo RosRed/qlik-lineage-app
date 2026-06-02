@@ -7,6 +7,7 @@ export function useAppData() {
   const [script, setScript] = useState('');
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeMode, setAnalyzeMode] = useState('claude'); // 'local' | 'claude'
 
   const selectApp = useCallback(async (app) => {
     setSelectedApp(app);
@@ -30,26 +31,41 @@ export function useAppData() {
     setAnalysis(null);
   }, []);
 
-  const saveAndAnalyze = useCallback(async () => {
+  const saveAndAnalyze = useCallback(async (mode) => {
+    const effectiveMode = mode || analyzeMode;
     if (!selectedApp) return;
     if (!script.trim()) { toast.error("Veuillez coller un script avant d'analyser"); return; }
+
     try {
       await appsApi.saveScript(selectedApp.id, script);
       setAnalyzing(true);
-      const result = await appsApi.analyze(selectedApp.id);
+
+      const result = await appsApi.analyze(selectedApp.id, effectiveMode);
       if (result.error) { toast.error(result.error); return; }
+
       const data = result.analysis || result;
       setAnalysis(data);
-      toast.success(`Analyse terminée — ${(data.lineage || []).length} champs tracés`);
+
+      const isLocal = effectiveMode === 'local' || data?.metadata?.mode === 'local';
+      const isCached = data?._cached;
+
+      if (isCached) {
+        toast.success('✅ Script inchangé — analyse en cache réutilisée', { icon: '💾' });
+      } else if (isLocal) {
+        toast.success(`⚡ Analyse locale terminée — ${(data.lineage || []).length} champs tracés`, { icon: '⚡' });
+      } else {
+        toast.success(`🤖 Analyse Claude terminée — ${(data.lineage || []).length} champs tracés`);
+      }
     } catch {
       toast.error("Erreur lors de l'analyse");
     } finally {
       setAnalyzing(false);
     }
-  }, [selectedApp, script]);
+  }, [selectedApp, script, analyzeMode]);
 
   return {
     selectedApp, setSelectedApp, script, setScript,
-    analysis, analyzing, selectApp, clearApp, saveAndAnalyze
+    analysis, analyzing, analyzeMode, setAnalyzeMode,
+    selectApp, clearApp, saveAndAnalyze
   };
 }

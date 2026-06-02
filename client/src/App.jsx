@@ -5,6 +5,7 @@ import OverviewTab from './components/OverviewTab.jsx';
 import LineageTab from './components/LineageTab.jsx';
 import ModelTab from './components/ModelTab.jsx';
 import ChatTab from './components/ChatTab.jsx';
+import ApiUsageWidget from './components/ApiUsageWidget.jsx';
 import { useApp } from './hooks/useApp.js';
 import { LayoutGrid, GitBranch, Network, MessageSquare } from 'lucide-react';
 
@@ -19,6 +20,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const {
     apps, selectedApp, script, analysis, analyzing, loadingApps,
+    analyzeMode, setAnalyzeMode,
     setScript, loadApps, selectApp, createApp, renameApp, deleteApp, saveAndAnalyze
   } = useApp();
 
@@ -28,16 +30,22 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden">
-      {/* Sidebar */}
-      <AppSidebar
-        apps={apps}
-        selectedApp={selectedApp}
-        onSelect={selectApp}
-        onCreate={createApp}
-        onRename={renameApp}
-        onDelete={deleteApp}
-        loading={loadingApps}
-      />
+      {/* Sidebar + widget usage */}
+      <div className="flex flex-col" style={{ width: 250, minWidth: 250 }}>
+        <div className="flex-1 overflow-hidden">
+          <AppSidebar
+            apps={apps}
+            selectedApp={selectedApp}
+            onSelect={selectApp}
+            onCreate={createApp}
+            onRename={renameApp}
+            onDelete={deleteApp}
+            loading={loadingApps}
+          />
+        </div>
+        {/* Widget statistiques API en bas de sidebar */}
+        <ApiUsageWidget />
+      </div>
 
       {/* Script Editor */}
       <ScriptEditor
@@ -46,6 +54,9 @@ export default function App() {
         onScriptChange={setScript}
         onAnalyze={saveAndAnalyze}
         analyzing={analyzing}
+        analyzeMode={analyzeMode}
+        onModeChange={setAnalyzeMode}
+        analysis={analysis}
       />
 
       {/* Result Panel */}
@@ -59,6 +70,12 @@ export default function App() {
                 {analysis && (
                   <p className="text-xs text-gray-500 mt-0.5">
                     {analysis.facts?.length || 0} faits · {analysis.dims?.length || 0} dims · {analysis.lineage?.length || 0} lignes de lineage
+                    {analysis?.metadata?.mode && (
+                      <span className={`ml-2 ${analysis.metadata.mode === 'local' ? 'text-yellow-600' : 'text-violet-600'}`}>
+                        · {analysis.metadata.mode === 'local' ? '⚡ local' : '🤖 claude'}
+                        {analysis._cached && ' · 💾 cache'}
+                      </span>
+                    )}
                   </p>
                 )}
               </div>

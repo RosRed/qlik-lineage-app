@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Trash2, Copy, Check, MessageSquare, ChevronDown } from 'lucide-react';
+import { Send, Trash2, Copy, Check, MessageSquare, ChevronDown, Zap, Brain } from 'lucide-react';
 import { api } from '../api';
 import toast from 'react-hot-toast';
 import hljs from 'highlight.js/lib/core';
@@ -118,7 +118,7 @@ export default function ChatTab({ app, analysis }) {
               const data = JSON.parse(line.slice(6));
               if (data.text) { full += data.text; setStreamText(full); }
               if (data.done) {
-                setMessages(prev => [...prev, { role: 'assistant', content: full, mode }]);
+                setMessages(prev => [...prev, { role: 'assistant', content: full, mode, source: data.source || 'claude' }]);
                 setStreamText('');
                 setStreaming(false);
               }
@@ -201,7 +201,21 @@ export default function ChatTab({ app, analysis }) {
                 : 'bg-gray-800/80 border border-gray-700/50 text-gray-200'
             }`}>
               {msg.role === 'assistant' ? (
-                <MessageContent content={msg.content} />
+                <>
+                  <MessageContent content={msg.content} />
+                  {/* Badge source */}
+                  <div className="mt-2 flex justify-end">
+                    {msg.source === 'local' ? (
+                      <span className="flex items-center gap-1 text-[10px] text-yellow-600 opacity-70">
+                        <Zap size={9} /> Local
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] text-violet-600 opacity-70">
+                        <Brain size={9} /> Claude
+                      </span>
+                    )}
+                  </div>
+                </>
               ) : (
                 <p className="text-sm">{msg.content}</p>
               )}
