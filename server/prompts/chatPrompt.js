@@ -1,43 +1,56 @@
 function getChatSystemPrompt(app, analysis) {
-  const a = analysis || {};
-  const factsStr = (a.facts || []).map(f => f.name).join(', ') || 'Non analysé';
-  const dimsStr = (a.dims || []).map(d => d.name).join(', ') || 'Non analysé';
-  const sourcesStr = (a.sources || []).join(', ') || 'Non analysé';
-  const calcFieldsStr = (a.calcFields || []).map(c => `${c.field} (${c.formula})`).join(', ') || 'Aucun';
-  const scriptExcerpt = app.scriptContent ? app.scriptContent.substring(0, 2000) : 'Aucun script chargé';
+  if (!analysis) {
+    return `Tu es un agent Data Lineage Qlik pour l'application "${app.name}". Aucune analyse n'a encore été faite. Demande à l'utilisateur d'analyser les scripts d'abord.`;
+  }
+
+  const a = analysis;
+  const list = (arr, fn, empty = '  Aucun') =>
+    arr?.length ? arr.map(fn).join('\n') : empty;
 
   return `Tu es un agent expert en Data Lineage, SQL et Qlik Sense/QlikView.
-Tu travailles sur l'application "${app.name}" de manière ISOLÉE.
+Tu travailles EXCLUSIVEMENT sur l'application "${a.appName}" — aucune donnée d'une autre app.
 
-Contexte de cette application :
-- Modèle : ${a.model || 'Non analysé'}
-- Tables de faits : ${factsStr}
-- Dimensions : ${dimsStr}
-- Sources : ${sourcesStr}
-- Champs calculés : ${calcFieldsStr}
-- Scripts originaux (extrait) : ${scriptExcerpt}
+═══════════════════════════════════════════
+CONTEXTE COMPLET DE L'APPLICATION
+═══════════════════════════════════════════
 
-RÈGLES :
-1. Tu ne mélanges JAMAIS les données d'autres applications
-2. Chaque champ doit être tracé jusqu'à sa source
-3. Les réponses SQL incluent toujours le chemin de lineage en commentaire
-4. Les scripts Qlik respectent le modèle en étoile de cette app
-5. Tu signales systématiquement les risques de clés synthétiques
-6. Réponds en français, le code en anglais/technique
+MODÈLE : ${a.model}
+SOURCES : ${(a.sources || []).join(' | ')}
 
-FORMAT SQL :
--- App : ${app.name}
--- Objectif : ...
--- Lineage : SOURCE → QVD → TABLE_QLIK
-SELECT ... FROM ... WHERE ...;
--- Équivalent Qlik : Sum(CHAMP) avec dimension X
+TABLES DE FAITS (${(a.facts || []).length}) :
+${list(a.facts, f => `  • ${f.name} [${(f.fields||[]).length} champs] — PK: ${(f.keys||[]).join(',')} — Source: ${f.source||'?'}`)}
 
-FORMAT QLIK :
-// App : ${app.name} | Section : ...
-[TABLE]:
-NoConcatenate
-LOAD champ AS CHAMP_QLIK
-FROM [lib://QVD/table.qvd] (qvd);`;
+DIMENSIONS (${(a.dims || []).length}) :
+${list(a.dims, d => `  • ${d.name} [${(d.fields||[]).length} champs] — PK: ${(d.keys||[]).join(',')} — Source: ${d.source||'?'}`)}
+
+MAPPINGS :
+${list(a.mappings, m => `  • ${m.name} : ${m.from} → ${m.applyMapUsage || m.to}`)}
+
+CHAMPS CALCULÉS (${(a.calcFields || []).length}) :
+${list(a.calcFields, c => `  • [${c.table}] ${c.field} = ${c.formula}`)}
+
+CLÉS SYNTHÉTIQUES :
+${list(a.synthKeys, k => `  ⚠️ ${k.field} = ${k.formula} — Risque: ${k.risk}`, '  Aucune')}
+
+LINEAGE (${(a.lineage || []).length} champs tracés) :
+${(a.lineage || []).slice(0, 50).map(l => `  ${l.tableQlik}.${l.fieldQlik} ← ${l.tableSource}.${l.fieldSource} [${l.transformation}]`).join('\n')}
+${(a.lineage||[]).length > 50 ? `  ... et ${a.lineage.length - 50} autres champs` : ''}
+
+JOINTURES :
+${list(a.joinConditions, j => `  ${j.leftTable} ↔ ${j.rightTable} sur ${j.joinField} (${j.joinType})`, '  Non détectées')}
+
+FILTRES :
+${list(a.filters, f => `  [${f.table}] WHERE ${f.condition} (${f.appliedAt})`)}
+
+═══════════════════════════════════════════
+RÈGLES DE RÉPONSE
+═══════════════════════════════════════════
+
+LINEAGE → trace champ → source physique, chaque transformation, usages dans d'autres tables
+SQL     → SQL complet commenté + équivalent Qlik + index recommandés
+QLIK    → script complet NoConcatenate, ApplyMap si pertinent, risques clés synthétiques
+
+Réponds en FRANÇAIS. Code en anglais/technique. Sois EXHAUSTIF.`;
 }
 
 module.exports = { getChatSystemPrompt };
