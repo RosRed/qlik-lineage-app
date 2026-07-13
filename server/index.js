@@ -5,7 +5,9 @@ const cors = require('cors');
 require('./database');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+// API_PORT en priorité — la variable PORT peut être injectée par l'outil de preview
+// (elle vaut alors le port Vite 5173, ce qui casserait le proxy /api → 3001)
+const PORT = process.env.API_PORT || (process.env.PORT !== '5173' ? process.env.PORT : null) || 3001;
 
 app.use(cors({ origin: 'http://localhost:5173' }));
 app.use(express.json({ limit: '10mb' }));

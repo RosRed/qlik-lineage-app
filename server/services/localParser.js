@@ -19,6 +19,41 @@ function removeComments(script) {
     .replace(/(?<!:)\/\/[^\n]*/g, '');
 }
 
+/**
+ * Résout les variables SET/LET dans le script (ex: $(vPath)ventes.qvd → lib://QVD/ventes.qvd).
+ * - SET : valeur substituée telle quelle (littéral)
+ * - LET : substituée seulement si la valeur est un littéral simple (pas d'appel de fonction,
+ *   car on n'évalue pas les expressions Qlik)
+ * Les $(var) non résolus sont laissés en place — le lineage global les traite en wildcard.
+ */
+function resolveVariables(script) {
+  const vars = new Map();
+  const defRe = /^[ \t]*(SET|LET)\s+([\w.]+)\s*=\s*(.+?);\s*$/gim;
+  let m;
+  while ((m = defRe.exec(script)) !== null) {
+    const kind = m[1].toUpperCase();
+    let val = m[3].trim();
+    // Retirer les quotes englobantes
+    const quoted = /^'(.*)'$/.exec(val) || /^"(.*)"$/.exec(val);
+    if (quoted) val = quoted[1];
+    else if (kind === 'LET' && /\w+\s*\(/.test(val)) continue; // expression non évaluable
+    if (val.length > 0 && val.length < 500) vars.set(m[2], val);
+  }
+  if (vars.size === 0) return script;
+
+  // Substitution itérative (variables imbriquées, max 3 passes)
+  let out = script;
+  for (let i = 0; i < 3; i++) {
+    let changed = false;
+    out = out.replace(/\$\(([\w.]+)\)/g, (all, name) => {
+      if (vars.has(name)) { changed = true; return vars.get(name); }
+      return all;
+    });
+    if (!changed) break;
+  }
+  return out;
+}
+
 const CONTROL_KEYWORDS = new Set([
   'IF','THEN','ELSE','ELSEIF','END','FOR','EACH','NEXT','DO','WHILE','LOOP',
   'SUB','EXIT','CALL','LET','SET','TRACE','REM','SWITCH','CASE','DEFAULT',
@@ -37,7 +72,8 @@ function extractSources(script) {
   const seen = new Set();
   const add = (s) => { if (s && !seen.has(s)) { seen.add(s); sources.push(s); } };
 
-  const qvdPat   = /FROM\s+\[?([^\]\n;,)]+\.qvd)\]?\s*\(qvd\)/gi;
+  // Non-greedy jusqu'à .qvd : tolère les $(var) (avec parenthèses) dans le chemin
+  const qvdPat   = /FROM\s+\[?([^\]\n;]+?\.qvd)\]?\s*\(qvd\)/gi;
   const sqlPat   = /\bSQL\b\s+SELECT[\s\S]+?\bFROM\b\s+([\w.[\]"]+)/gi;
   const filePat  = /FROM\s+\[?([^\]\n;)]+\.(xlsx?|csv|txt|qvo|tab))\]?/gi;
   const connPat  = /LIB\s+CONNECT\s+TO\s+['"]([^'"]+)['"]/gi;
@@ -316,7 +352,7 @@ function generateSummary(appName, facts, dims, sources, synthKeys, model, stores
 // ─── Entrée principale ────────────────────────────────────────────────────────
 
 function parseQlikScript(scriptContent, appName = 'Application') {
-  const script = scriptContent || '';
+  const script = resolveVariables(scriptContent || '');
   const cleaned = removeComments(script);
 
   const sources = extractSources(cleaned);
