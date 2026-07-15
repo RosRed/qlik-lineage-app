@@ -11,6 +11,7 @@ import { globalApi, adminApi } from '../api/qlikApi';
 import QlikImportModal from './QlikImportModal.jsx';
 import TasksTab from './TasksTab.jsx';
 import SyntheseTab from './SyntheseTab.jsx';
+import GovernanceTab from './GovernanceTab.jsx';
 
 // ─── Graphe global apps ↔ QVD ────────────────────────────────────────────────
 
@@ -221,6 +222,7 @@ export default function GlobalTab({ onAppsChanged }) {
               ['problemes', `⚠ Problèmes (${problemCount})`],
               ['apps', `Apps (${data.apps.length})`],
               ['taches', '⏱ Tâches & planification'],
+              ['gouvernance', '🛡 Gouvernance'],
             ].map(([id, label]) => (
               <button key={id} onClick={() => setView(id)}
                 className={`px-3 py-2 text-xs font-medium border-b-2 -mb-px ${view === id ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>
@@ -398,6 +400,9 @@ export default function GlobalTab({ onAppsChanged }) {
 
           {/* Tâches & planification */}
           {view === 'taches' && <TasksTab />}
+
+          {/* Gouvernance serveur */}
+          {view === 'gouvernance' && <GovernanceTab />}
 
           {/* Problèmes */}
           {view === 'problemes' && (

@@ -86,6 +86,14 @@ const migrations = [
   'ALTER TABLE apps ADD COLUMN published INTEGER DEFAULT 0',
   'ALTER TABLE apps ADD COLUMN owner TEXT',
   'ALTER TABLE apps ADD COLUMN last_reload TEXT',
+  // Métadonnées QRS enrichies (P3)
+  'ALTER TABLE apps ADD COLUMN file_size INTEGER',
+  'ALTER TABLE apps ADD COLUMN created_date TEXT',
+  'ALTER TABLE apps ADD COLUMN modified_date TEXT',
+  'ALTER TABLE apps ADD COLUMN publish_time TEXT',
+  'ALTER TABLE apps ADD COLUMN description TEXT',
+  'ALTER TABLE apps ADD COLUMN tags TEXT',
+  'ALTER TABLE apps ADD COLUMN custom_properties TEXT',
 ];
 for (const sql of migrations) {
   try { db.exec(sql); } catch (_) { /* colonne déjà présente */ }

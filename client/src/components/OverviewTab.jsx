@@ -54,13 +54,49 @@ export default function OverviewTab({ analysis, analyzing }) {
         <StatCard icon={Database} label="Sources" value={analysis.sources?.length || 0} color="text-purple-400" />
       </div>
 
-      {/* Model type */}
-      <div className="bg-gray-800/60 rounded-lg p-4 border border-gray-700/50">
-        <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Type de Modèle</h3>
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">{modelIcons[analysis.model] || '🔀'}</span>
-          <span className="text-lg font-semibold text-white capitalize">{analysis.model || 'Mixte'}</span>
+      {/* Model type + couverture du parsing */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-gray-800/60 rounded-lg p-4 border border-gray-700/50">
+          <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Type de Modèle</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{modelIcons[analysis.model] || '🔀'}</span>
+            <span className="text-lg font-semibold text-white capitalize">{analysis.model || 'Mixte'}</span>
+          </div>
         </div>
+        {analysis.metadata?.coverage && (() => {
+          const cov = analysis.metadata.coverage;
+          const color = cov.score >= 90 ? 'text-emerald-400 border-emerald-700/40'
+            : cov.score >= 70 ? 'text-yellow-400 border-yellow-700/40'
+            : 'text-red-400 border-red-700/40';
+          return (
+            <div className={`bg-gray-800/60 rounded-lg p-4 border border-gray-700/50`}>
+              <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Couverture du parsing</h3>
+              <div className="flex items-center gap-3">
+                <span className={`text-lg font-bold px-2 py-0.5 rounded border ${color}`}>{cov.score} %</span>
+                <span className="text-[11px] text-gray-500">
+                  {cov.parsedBlocks}/{cov.loadStatements} LOAD rattachés
+                </span>
+              </div>
+              {cov.unparsed?.length > 0 && (
+                <details className="mt-2">
+                  <summary className="text-[10px] text-gray-500 cursor-pointer hover:text-gray-300">
+                    {cov.unparsed.length} LOAD non rattaché(s) — détail
+                  </summary>
+                  <ul className="mt-1 space-y-0.5 text-[10px] text-gray-500">
+                    {cov.unparsed.map((u, i) => (
+                      <li key={i}>ligne {u.line} : {u.reason}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {cov.unresolvedVariables?.length > 0 && (
+                <div className="mt-1.5 text-[10px] text-gray-600">
+                  Variables non résolues : <span className="font-mono">{cov.unresolvedVariables.slice(0, 6).join(', ')}{cov.unresolvedVariables.length > 6 ? '…' : ''}</span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Summary */}
@@ -74,17 +110,7 @@ export default function OverviewTab({ analysis, analyzing }) {
         </div>
       )}
 
-      {/* Sources */}
-      {analysis.sources?.length > 0 && (
-        <div className="bg-gray-800/60 rounded-lg p-4 border border-gray-700/50">
-          <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-3">Sources de données</h3>
-          <div className="flex flex-wrap gap-2">
-            {analysis.sources.map((s, i) => (
-              <span key={i} className="text-xs px-2 py-1 bg-purple-900/40 text-purple-300 border border-purple-700/50 rounded font-mono">{s}</span>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Sources → voir l'onglet « Sources » dédié */}
 
       {/* Tables */}
       <div className="grid grid-cols-1 gap-4">

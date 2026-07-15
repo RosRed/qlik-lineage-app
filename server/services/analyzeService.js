@@ -107,13 +107,15 @@ async function runAnalysis(appId, mode = 'claude') {
   const fullScript = scripts.map(s => s.content).join('\n\n// === SCRIPT SUIVANT ===\n\n');
   const hash = scriptHash(fullScript);
 
-  // Vérification du cache (pour le mode Claude uniquement)
+  // Vérification du cache (mode Claude uniquement) — le cache n'est valable que si
+  // l'analyse existante est elle-même une analyse Claude, sinon une app analysée en
+  // local ne pourrait plus jamais être ré-analysée par Claude (même hash).
   if (mode === 'claude') {
     const existing = db.prepare(
       'SELECT result, script_hash, analyze_mode FROM analyses WHERE app_id = ? ORDER BY analyzed_at DESC LIMIT 1'
     ).get(appId);
 
-    if (existing && existing.script_hash === hash) {
+    if (existing && existing.script_hash === hash && existing.analyze_mode === 'claude') {
       console.log(`[Analyze] ✅ Cache hit — "${app.name}" (script inchangé)`);
       trackUsage('cache_hit', 0, 0, 'none');
       const cached = JSON.parse(existing.result);

@@ -51,7 +51,15 @@ const LOCAL_PATTERNS = [
   /(?:lineage|trace|d.où vient|origin|source)\s+(?:de\s+|du\s+|d'|of\s+)?[a-z0-9_]+/i,
 ];
 
+// Une question n'est routée en local que si elle est COURTE et simple.
+// Les questions longues/complexes contiennent souvent un mot-clé ("table", "source"…)
+// mais attendent une vraie réponse Claude, pas une liste brute.
+const LOCAL_MAX_LENGTH = 80;
+const COMPLEX_MARKERS = /(explique|pourquoi|comment|compare|génère|genere|écris|ecris|crée|cree|optimise|corrige|améliore|ameliore|propose|détail|detail|analyse)/i;
+
 function isLocalQuestion(message) {
+  if (message.length > LOCAL_MAX_LENGTH) return false;
+  if (COMPLEX_MARKERS.test(message)) return false;
   return LOCAL_PATTERNS.some(pat => pat.test(message));
 }
 
@@ -104,7 +112,7 @@ async function sendClaudeResponse(appId, message, mode, app, analysis, history, 
 
 // ─── Entrée principale ────────────────────────────────────────────────────────
 
-async function streamChat(appId, message, mode, res) {
+async function streamChat(appId, message, mode, res, { forceClaude = false } = {}) {
   const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(appId);
   if (!app) throw Object.assign(new Error('App introuvable'), { status: 404 });
 
@@ -114,8 +122,8 @@ async function streamChat(appId, message, mode, res) {
   // Sauvegarder le message utilisateur
   saveChatMessage(appId, 'user', message, mode, 'user');
 
-  // Tenter une réponse locale si la question est simple
-  if (isLocalQuestion(message)) {
+  // Tenter une réponse locale si la question est simple (sauf si le client force Claude)
+  if (!forceClaude && isLocalQuestion(message)) {
     const localAnswer = localChatAnswer(message, analysis);
     if (localAnswer !== null) {
       console.log(`[Chat/Local] Réponse locale pour: "${message.slice(0, 60)}..."`);

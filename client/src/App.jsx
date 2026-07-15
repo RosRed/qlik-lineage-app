@@ -6,12 +6,14 @@ import LineageTab from './components/LineageTab.jsx';
 import ModelTab from './components/ModelTab.jsx';
 import ChatTab from './components/ChatTab.jsx';
 import GlobalTab from './components/GlobalTab.jsx';
+import SourcesTab from './components/SourcesTab.jsx';
 import ApiUsageWidget from './components/ApiUsageWidget.jsx';
 import { useApp } from './hooks/useApp.js';
-import { LayoutGrid, GitBranch, Network, MessageSquare, Globe } from 'lucide-react';
+import { LayoutGrid, GitBranch, Network, MessageSquare, Globe, Database } from 'lucide-react';
 
 const APP_TABS = [
   { id: 'overview', label: 'Vue d\'ensemble', icon: LayoutGrid },
+  { id: 'sources', label: 'Sources', icon: Database },
   { id: 'lineage', label: 'Lineage', icon: GitBranch },
   { id: 'model', label: 'Modèle', icon: Network },
   { id: 'chat', label: 'SQL / Qlik', icon: MessageSquare }
@@ -133,6 +135,7 @@ export default function App() {
           ) : selectedApp ? (
             <>
               {activeTab === 'overview' && <OverviewTab analysis={analysis} analyzing={analyzing} />}
+              {activeTab === 'sources' && <SourcesTab analysis={analysis} analyzing={analyzing} />}
               {activeTab === 'lineage' && <LineageTab analysis={analysis} appName={selectedApp?.name} analyzing={analyzing} />}
               {activeTab === 'model' && <ModelTab analysis={analysis} analyzing={analyzing} />}
               {activeTab === 'chat' && <ChatTab app={selectedApp} analysis={analysis} />}

@@ -1,11 +1,33 @@
-import React, { useState } from 'react';
-import { Plus, Pencil, Trash2, Database, Check, X } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Pencil, Trash2, Database, Check, X, Search } from 'lucide-react';
+
+// Normalisation accents/casse pour la recherche
+const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 export default function AppSidebar({ apps, selectedApp, onSelect, onCreate, onRename, onDelete, loading }) {
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
+  const [search, setSearch] = useState('');
+  const [streamFilter, setStreamFilter] = useState('');
+  const [stateFilter, setStateFilter] = useState(''); // '' | 'analyzed' | 'not_analyzed'
+
+  const streams = useMemo(
+    () => [...new Set(apps.map(a => a.stream).filter(Boolean))].sort(),
+    [apps]
+  );
+
+  const filteredApps = useMemo(() => {
+    const q = norm(search.trim());
+    return apps.filter(a => {
+      if (q && !norm(a.name).includes(q)) return false;
+      if (streamFilter && a.stream !== streamFilter) return false;
+      if (stateFilter === 'analyzed' && !a.analyzed) return false;
+      if (stateFilter === 'not_analyzed' && a.analyzed) return false;
+      return true;
+    });
+  }, [apps, search, streamFilter, stateFilter]);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -58,6 +80,40 @@ export default function AppSidebar({ apps, selectedApp, onSelect, onCreate, onRe
         )}
       </div>
 
+      {/* Filtres */}
+      <div className="p-3 border-b border-gray-800 space-y-2">
+        <div className="relative">
+          <Search size={12} className="absolute left-2.5 top-2 text-gray-600" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Rechercher une app..."
+            className="w-full bg-gray-800 text-xs text-gray-200 border border-gray-700 rounded pl-8 pr-2 py-1.5 outline-none focus:border-emerald-500"
+          />
+        </div>
+        <div className="flex gap-1.5">
+          {streams.length > 0 && (
+            <select
+              value={streamFilter}
+              onChange={e => setStreamFilter(e.target.value)}
+              className="flex-1 min-w-0 bg-gray-800 text-[11px] text-gray-300 border border-gray-700 rounded px-1.5 py-1 outline-none focus:border-emerald-500"
+            >
+              <option value="">Streams</option>
+              {streams.map(st => <option key={st} value={st}>{st}</option>)}
+            </select>
+          )}
+          <select
+            value={stateFilter}
+            onChange={e => setStateFilter(e.target.value)}
+            className="flex-1 min-w-0 bg-gray-800 text-[11px] text-gray-300 border border-gray-700 rounded px-1.5 py-1 outline-none focus:border-emerald-500"
+          >
+            <option value="">Toutes</option>
+            <option value="analyzed">Analysées</option>
+            <option value="not_analyzed">Non analysées</option>
+          </select>
+        </div>
+      </div>
+
       <nav className="flex-1 overflow-y-auto p-2">
         {loading && (
           <div className="space-y-2 p-2">
@@ -69,7 +125,12 @@ export default function AppSidebar({ apps, selectedApp, onSelect, onCreate, onRe
             Aucune application.<br />Créez-en une pour commencer.
           </div>
         )}
-        {apps.map(app => (
+        {!loading && apps.length > 0 && filteredApps.length === 0 && (
+          <div className="text-center text-gray-600 text-xs p-4 mt-4">
+            Aucune app ne correspond aux filtres.
+          </div>
+        )}
+        {filteredApps.map(app => (
           <div
             key={app.id}
             className={`group flex items-center gap-2 px-3 py-2 rounded cursor-pointer mb-1 transition-colors ${
@@ -118,7 +179,9 @@ export default function AppSidebar({ apps, selectedApp, onSelect, onCreate, onRe
       </nav>
 
       <div className="p-3 border-t border-gray-800 text-xs text-gray-600 text-center">
-        {apps.length} application{apps.length !== 1 ? 's' : ''}
+        {filteredApps.length !== apps.length
+          ? `${filteredApps.length} affichée${filteredApps.length !== 1 ? 's' : ''} / ${apps.length} au total`
+          : `${apps.length} application${apps.length !== 1 ? 's' : ''}`}
       </div>
     </aside>
   );

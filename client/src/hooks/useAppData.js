@@ -7,7 +7,7 @@ export function useAppData() {
   const [script, setScript] = useState('');
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [analyzeMode, setAnalyzeMode] = useState('claude'); // 'local' | 'claude'
+  const [analyzeMode, setAnalyzeMode] = useState('local'); // 'local' (défaut) | 'claude'
 
   const selectApp = useCallback(async (app) => {
     setSelectedApp(app);

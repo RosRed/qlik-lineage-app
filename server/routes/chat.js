@@ -12,12 +12,16 @@ router.get('/', (req, res) => {
 
 // POST /api/apps/:id/chat
 router.post('/', async (req, res) => {
-  const { message, mode } = req.body;
+  const { message, mode, forceClaude } = req.body;
   if (!message) return res.status(400).json({ error: 'Message requis' });
   try {
-    await streamChat(req.params.id, message, mode, res);
+    await streamChat(req.params.id, message, mode, res, { forceClaude: !!forceClaude });
   } catch (err) {
     console.error('[Chat]', err.message);
+    // Si les en-têtes SSE ne sont pas encore partis, répondre en JSON avec le bon status
+    if (!res.headersSent) {
+      return res.status(err.status || 500).json({ error: err.message });
+    }
     res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
     res.end();
   }

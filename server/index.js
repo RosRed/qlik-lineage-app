@@ -14,7 +14,11 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/api', require('./routes'));
 
 app.get('/api/health', (req, res) =>
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    hasApiKey: !!process.env.ANTHROPIC_API_KEY
+  })
 );
 
 app.listen(PORT, () => {

@@ -2,9 +2,14 @@ const express = require('express');
 const router = express.Router();
 const db = require('../database');
 
-// GET /api/apps
+// GET /api/apps — avec indicateur d'analyse (pour les filtres de la sidebar)
 router.get('/', (req, res) => {
-  const apps = db.prepare('SELECT * FROM apps ORDER BY updated_at DESC').all();
+  const apps = db.prepare(`
+    SELECT a.*, CASE WHEN an.id IS NULL THEN 0 ELSE 1 END AS analyzed
+    FROM apps a
+    LEFT JOIN (SELECT DISTINCT app_id, MIN(id) AS id FROM analyses GROUP BY app_id) an ON an.app_id = a.id
+    ORDER BY a.updated_at DESC
+  `).all();
   res.json(apps);
 });
 

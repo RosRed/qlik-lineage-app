@@ -98,18 +98,11 @@ async function testConnection(config) {
   return { ok: true, buildVersion: about.buildVersion, productName: about.productName || 'Qlik Sense' };
 }
 
-/** Liste toutes les apps du serveur avec leur stream */
+/** Liste toutes les apps du serveur avec leur stream et métadonnées enrichies */
 async function listApps(config) {
+  const { mapQrsApp } = require('./qrsMappers');
   const apps = await qrsRequest(config, '/app/full');
-  return apps.map(a => ({
-    qlikAppId: a.id,
-    name: a.name,
-    stream: a.stream ? a.stream.name : null,
-    published: a.published,
-    owner: a.owner ? `${a.owner.userDirectory}\\${a.owner.userId}` : null,
-    lastReloadTime: a.lastReloadTime || null,
-    modifiedDate: a.modifiedDate || null
-  }));
+  return apps.map(mapQrsApp);
 }
 
 module.exports = { testConnection, listApps, qrsRequest, loadCerts };

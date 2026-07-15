@@ -16,6 +16,10 @@ export const qlikApi = {
   import:     (apps, analyzeMode) => post(`${BASE}/qlik/import`, { apps, analyzeMode }),
   importProgress: () => fetch(`${BASE}/qlik/import/progress`).then(json),
   tasks:      ()      => fetch(`${BASE}/qlik/tasks`).then(json),
+  tasksExportUrl: ()  => `${BASE}/qlik/tasks/export`,
+  governance: (refresh) => fetch(`${BASE}/qlik/governance${refresh ? '?refresh=1' : ''}`).then(json),
+  appsCleanup: (staleDays) => fetch(`${BASE}/qlik/apps/cleanup${staleDays ? `?staleDays=${staleDays}` : ''}`).then(json),
+  connections: ()     => fetch(`${BASE}/qlik/connections`).then(json),
 };
 
 export const globalApi = {

@@ -162,16 +162,9 @@ async function testConnection(config) {
 }
 
 async function listApps(config) {
+  const { mapQrsApp } = require('./qrsMappers');
   const apps = await qrsRequest(config, '/app/full');
-  return apps.map(a => ({
-    qlikAppId: a.id,
-    name: a.name,
-    stream: a.stream ? a.stream.name : null,
-    published: a.published,
-    owner: a.owner ? `${a.owner.userDirectory}\\${a.owner.userId}` : null,
-    lastReloadTime: a.lastReloadTime || null,
-    modifiedDate: a.modifiedDate || null
-  }));
+  return apps.map(mapQrsApp);
 }
 
 /** Script d'une app via l'Engine à travers le proxy (wss sur 443, cookie de session) */
