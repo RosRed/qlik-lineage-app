@@ -1,0 +1,34 @@
+# Qlik Lineage App
+
+Application locale de Data Lineage pour Qlik Sense / QlikView, propulsée par Claude AI.
+
+## Installation
+
+```bash
+# 1. Installer les dépendances
+npm run install:all
+
+# 2. Ajouter votre clé API dans .env
+ANTHROPIC_API_KEY=sk-ant-...
+
+# 3. Lancer
+npm run dev
+```
+
+- Frontend : http://localhost:5173  
+- Backend : http://localhost:3001
+
+## Utilisation
+
+1. **Créer une app** → clic sur `+ Nouvelle App` dans la sidebar
+2. **Coller le script** Qlik (.qvs) ou SQL dans l'éditeur central
+3. **Analyser** → clic sur `Analyser avec Claude`
+4. **Explorer** les résultats dans les 4 onglets :
+   - **Vue d'ensemble** — stats, sources, clés synthétiques
+   - **Lineage** — tableau complet avec filtres + export CSV
+   - **Modèle** — schéma des tables (FACT / DIM / MAP)
+   - **SQL / Qlik** — chat IA pour générer du SQL ou des scripts
+
+## Stack
+
+Node.js · Express · SQLite · React · Vite · Tailwind · Anthropic API

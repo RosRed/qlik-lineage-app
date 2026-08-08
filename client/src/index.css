@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Thème commutable — toutes les couleurs passent par des variables CSS.
+ * Le basculement se fait via [data-theme] sur <html> (voir ThemeContext.jsx),
+ * ce qui évite d'avoir à écrire des variantes `dark:` dans chaque composant.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  --c-canvas: #0b0e14;
+  --c-surface: #12161f;
+  --c-raised: #1a202c;
+  --c-line: #232a36;
+  --c-line-strong: #313b4a;
+  --c-ink: #e6eaf0;
+  --c-ink-muted: #9aa5b4;
+  --c-ink-faint: #6b7684;
+  --c-accent: #10b981;
+  --c-accent-ink: #34d399;
+  --c-accent-soft: rgba(16, 185, 129, 0.14);
+  --c-danger: #f87171;
+  --c-danger-soft: rgba(248, 113, 113, 0.12);
+  --c-warn: #fbbf24;
+  --c-warn-soft: rgba(251, 191, 36, 0.12);
+  --c-info: #22d3ee;
+  --c-violet: #a78bfa;
+  --c-shadow: rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --c-canvas: #f7f8fa;
+  --c-surface: #ffffff;
+  --c-raised: #f0f2f5;
+  --c-line: #e2e5ea;
+  --c-line-strong: #c9ced6;
+  --c-ink: #1a1d23;
+  --c-ink-muted: #5a6472;
+  --c-ink-faint: #8a93a0;
+  --c-accent: #059669;
+  --c-accent-ink: #047857;
+  --c-accent-soft: rgba(5, 150, 105, 0.1);
+  --c-danger: #dc2626;
+  --c-danger-soft: rgba(220, 38, 38, 0.08);
+  --c-warn: #b45309;
+  --c-warn-soft: rgba(180, 83, 9, 0.08);
+  --c-info: #0e7490;
+  --c-violet: #6d28d9;
+  --c-shadow: rgba(16, 24, 40, 0.08);
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--c-canvas);
+  color: var(--c-ink);
+  /* 14px de base au lieu de 12px — la densité extrême était le principal
+     reproche fait à l'ancienne interface. */
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: 'JetBrains Mono', Consolas, monospace;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--c-line-strong);
+  border-radius: 5px;
+  border: 2px solid var(--c-canvas);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--c-ink-faint);
+}
+
+/* Highlight.js — suit le thème */
+.hljs {
+  background: var(--c-raised) !important;
+  color: var(--c-ink) !important;
+  border-radius: 8px;
+  padding: 1rem !important;
+}
+
+/* Skeleton de chargement */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--c-surface) 25%,
+    var(--c-raised) 50%,
+    var(--c-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+/* Anneau de focus visible au clavier — absent de l'ancienne interface */
+:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
