@@ -20,8 +20,9 @@ const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 
 app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
-app.use('/api', require('./routes'));
 
+// Endpoint de santé PUBLIC — doit être avant le montage de /api pour ne pas
+// hériter du middleware requireAuth. Sert aux healthchecks Apache/monitoring.
 app.get('/api/health', (req, res) =>
   res.json({
     status: 'ok',
@@ -30,6 +31,8 @@ app.get('/api/health', (req, res) =>
     authEnabled: !AUTH_DISABLED
   })
 );
+
+app.use('/api', require('./routes'));
 
 // En production, servir le build du client depuis Express.
 // Le dossier client/dist est généré par `npm run build` côté client.
