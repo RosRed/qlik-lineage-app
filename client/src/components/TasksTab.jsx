@@ -275,7 +275,14 @@ function DeadChainsSection({ tasks, chains }) {
 // ─── Vue Nettoyage : tableau trié par score ───────────────────────────────────
 
 function CleanupView({ data }) {
-  const [search, setSearch] = useState('');
+  // Préfiltre depuis l'URL : ?app=NomApp → utile pour arriver ici depuis
+  // une carte QVD ou une app détaillée en un clic.
+  const initialSearch = (() => {
+    if (typeof window === 'undefined') return '';
+    const p = new URLSearchParams(window.location.search);
+    return p.get('app') || '';
+  })();
+  const [search, setSearch] = useState(initialSearch);
   const [recoFilter, setRecoFilter] = useState('');
   const [streamFilter, setStreamFilter] = useState('');
   const [triggerFilter, setTriggerFilter] = useState('');
@@ -466,7 +473,14 @@ function CleanupView({ data }) {
                 <td className="py-2 pr-3 text-gray-200 max-w-[220px] truncate" title={t.name}>{t.name}</td>
                 <td className="py-2 pr-3 max-w-[180px]">
                   <div className="text-gray-300 truncate flex items-center gap-1" title={t.appName}>
-                    <span className="truncate">{t.appName}</span>
+                    {/* Lien Apps ↔ Tâches — clic navigue vers /apps préfiltré par nom.
+                        stopPropagation pour ne pas déclencher l'expand de la ligne. */}
+                    <a href={`/apps?search=${encodeURIComponent(t.appName)}`}
+                       onClick={e => e.stopPropagation()}
+                       className="truncate hover:text-info hover:underline"
+                       title={`Voir « ${t.appName} » dans les applications`}>
+                      {t.appName}
+                    </a>
                     {t.feedsClient && (
                       <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-900/40 text-emerald-300 shrink-0"
                         title="Chaîne aboutissant à un stream client — ne pas casser">

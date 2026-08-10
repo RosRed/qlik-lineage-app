@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Database } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, Database, Clock, Link2, Zap, User, Ban } from 'lucide-react';
 import { useGlobalContext } from '../../layouts/GlobalLayout.jsx';
+import { qlikApi } from '../../api/qlikApi';
 import { PageBody, SearchInput, Select, EmptyState } from '../../components/ui/primitives';
 import { AppChips, QvdStatusBadge } from '../../components/global/bits.jsx';
 
@@ -68,22 +69,53 @@ export default function QvdsPage() {
   const [folder, setFolder] = useState('');
   const [stream, setStream] = useState('');
   const [consumers, setConsumers] = useState(''); // '', '0', '1', '2+', '5+'
+  const [app, setApp] = useState('');             // filtre par appId (producteur OU consommateur)
+  const [taskFilter, setTaskFilter] = useState(''); // '' | 'has_task' | 'no_task' | 'no_producer_task'
   const [sort, setSort] = useState('name');       // name | consumers | producers
   const [expanded, setExpanded] = useState(null);
 
-  const { folders, streams } = useMemo(() => {
+  // Charge les tâches Qlik une fois → Map<qlikAppId, {triggerType, enabled, name}>.
+  // Sans cache Qlik → renvoie null et les pictos affichent "inconnu".
+  const [taskMap, setTaskMap] = useState(null);
+  useEffect(() => {
+    qlikApi.tasks(false)
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.tasks || []);
+        const m = new Map();
+        for (const t of list) {
+          if (!t.qlikAppId) continue;
+          const prev = m.get(t.qlikAppId);
+          // Priorité aux tâches activées et aux triggers "réels" (schedule/chain)
+          const rank = (tt) => (tt.enabled ? 10 : 0) + ({ schedule: 3, mixte: 3, chain: 2, manual: 1 }[tt.triggerType] || 0);
+          if (!prev || rank(t) > rank(prev)) m.set(t.qlikAppId, t);
+        }
+        setTaskMap(m);
+      })
+      .catch(() => setTaskMap(new Map())); // vide → pictos "pas de tâche" au lieu d'inconnu
+  }, []);
+
+  const { folders, streams, appsList } = useMemo(() => {
     const fset = new Set();
     const sset = new Set();
+    const aset = new Map(); // appId -> appName (dedup)
     for (const q of data.qvds) {
       fset.add(parentFolder(q.name));
-      for (const a of q.producers) sset.add(a.stream || '(non publiée)');
-      for (const a of q.consumers) sset.add(a.stream || '(non publiée)');
+      for (const a of q.producers) {
+        sset.add(a.stream || '(non publiée)');
+        if (a.appId) aset.set(a.appId, a.appName);
+      }
+      for (const a of q.consumers) {
+        sset.add(a.stream || '(non publiée)');
+        if (a.appId) aset.set(a.appId, a.appName);
+      }
     }
-    return { folders: [...fset].sort(), streams: [...sset].sort() };
+    const appsList = [...aset.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    return { folders: [...fset].sort(), streams: [...sset].sort(), appsList };
   }, [data.qvds]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const appId = app ? Number(app) : null;
     const list = data.qvds.filter(x => {
       if (status && x.status !== status) return false;
       if (folder && parentFolder(x.name) !== folder) return false;
@@ -98,6 +130,17 @@ export default function QvdsPage() {
         if (consumers === '2+' && n < 2) return false;
         if (consumers === '5+' && n < 5) return false;
       }
+      if (appId != null) {
+        const involved = [...x.producers, ...x.consumers].some(a => a.appId === appId);
+        if (!involved) return false;
+      }
+      if (taskFilter && taskMap) {
+        const apps = [...x.producers, ...x.consumers];
+        const producers = x.producers;
+        if (taskFilter === 'has_task' && !apps.some(a => taskMap.get(a.qlikAppId))) return false;
+        if (taskFilter === 'no_task' && apps.some(a => taskMap.get(a.qlikAppId))) return false;
+        if (taskFilter === 'no_producer_task' && (producers.length === 0 || producers.some(a => taskMap.get(a.qlikAppId)))) return false;
+      }
       if (!q) return true;
       return x.name.toLowerCase().includes(q)
         || x.producers.some(p => p.appName.toLowerCase().includes(q))
@@ -106,11 +149,12 @@ export default function QvdsPage() {
     if (sort === 'consumers') list.sort((a, b) => b.consumers.length - a.consumers.length || a.name.localeCompare(b.name));
     else if (sort === 'producers') list.sort((a, b) => b.producers.length - a.producers.length || a.name.localeCompare(b.name));
     return list;
-  }, [data.qvds, search, status, folder, stream, consumers, sort]);
+  }, [data.qvds, search, status, folder, stream, consumers, app, taskFilter, taskMap, sort]);
 
-  const hasActiveFilter = search || status || folder || stream || consumers || sort !== 'name';
+  const hasActiveFilter = search || status || folder || stream || consumers || app || taskFilter || sort !== 'name';
   const resetAll = () => {
-    setSearch(''); setStatus(''); setFolder(''); setStream(''); setConsumers(''); setSort('name');
+    setSearch(''); setStatus(''); setFolder(''); setStream(''); setConsumers('');
+    setApp(''); setTaskFilter(''); setSort('name');
   };
 
   return (
@@ -143,6 +187,16 @@ export default function QvdsPage() {
           <option value="2+">2 et +</option>
           <option value="5+">5 et +</option>
         </Select>
+        <Select value={app} onChange={setApp} aria-label="Filtrer par app">
+          <option value="">Toutes apps ({appsList.length})</option>
+          {appsList.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </Select>
+        <Select value={taskFilter} onChange={setTaskFilter} aria-label="Filtrer par tâche">
+          <option value="">Tâches : tous</option>
+          <option value="has_task">≥ 1 app avec tâche</option>
+          <option value="no_task">Aucune app avec tâche</option>
+          <option value="no_producer_task">Producteur sans tâche ⚠</option>
+        </Select>
         <Select value={sort} onChange={setSort} aria-label="Trier">
           <option value="name">Trier : nom</option>
           <option value="consumers">Trier : + consommé</option>
@@ -158,6 +212,17 @@ export default function QvdsPage() {
           {filtered.length} / {data.qvds.length} QVD
         </span>
       </div>
+
+      {taskMap && (
+        <div className="flex items-center gap-3 text-[10px] text-ink-faint mb-3">
+          <span className="uppercase tracking-wider">Légende tâches :</span>
+          <span className="inline-flex items-center gap-1"><Clock size={11} className="text-emerald-400" /> planifiée</span>
+          <span className="inline-flex items-center gap-1"><Link2 size={11} className="text-violet-400" /> chaînée</span>
+          <span className="inline-flex items-center gap-1"><Zap size={11} className="text-emerald-400" /> planifiée + chaînée</span>
+          <span className="inline-flex items-center gap-1"><User size={11} className="text-yellow-400" /> manuelle</span>
+          <span className="inline-flex items-center gap-1"><Ban size={11} className="text-red-400" /> aucune tâche</span>
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <EmptyState
@@ -206,8 +271,8 @@ export default function QvdsPage() {
                       {x.name}
                     </td>
                     <td className="py-2 pr-3 align-top"><QvdStatusBadge status={x.status} /></td>
-                    <td className="py-2 pr-3 align-top"><AppChips list={x.producers} /></td>
-                    <td className="py-2 pr-3 align-top"><AppChips list={x.consumers} /></td>
+                    <td className="py-2 pr-3 align-top"><AppChips list={x.producers} taskMap={taskMap} /></td>
+                    <td className="py-2 pr-3 align-top"><AppChips list={x.consumers} taskMap={taskMap} /></td>
                   </tr>
                   {expanded === x.name && <QvdDetail qvd={x} />}
                 </React.Fragment>

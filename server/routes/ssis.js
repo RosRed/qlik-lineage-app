@@ -12,6 +12,7 @@ const db = require('../database');
 const ssisClient = require('../lib/ssisClient');
 const ssisService = require('../services/ssisService');
 const autoSnapshot = require('../services/ssisAutoSnapshot');
+const namedSnap = require('../services/ssisNamedSnapshot');
 const localDb = db;
 
 // Middleware — la config doit exister pour toutes les vues data
@@ -214,6 +215,42 @@ router.post('/reconnect', handle(async () => {
   return { ok: true, message: 'Pool de connexion fermé — la prochaine requête ouvrira une session fraîche' };
 }));
 
+// ── Snapshots nommés (à la demande, granularité société) ──────────────────
+
+router.get('/named-snapshots', handle(async (req) => {
+  return namedSnap.listSnapshots({
+    db: localDb,
+    serverKey: req.query.server_key || null,
+    database: req.query.database || null
+  });
+}));
+
+router.post('/named-snapshots', requireConfig, handle(async (req) => {
+  const { database, label, description } = req.body || {};
+  return namedSnap.captureNamedSnapshot(req.ssisConfig, {
+    database, label, description, db: localDb
+  });
+}));
+
+router.get('/named-snapshots/compare', handle(async (req) => {
+  const aId = parseInt(req.query.a, 10);
+  const bId = parseInt(req.query.b, 10);
+  if (!aId || !bId) throw Object.assign(new Error('paramètres a et b requis'), { status: 400 });
+  return namedSnap.compareSnapshots({ db: localDb, aId, bId });
+}));
+
+router.get('/named-snapshots/:id', handle(async (req) => {
+  return namedSnap.getSnapshot({ db: localDb, id: parseInt(req.params.id, 10) });
+}));
+
+router.delete('/named-snapshots/:id', handle(async (req) => {
+  return namedSnap.deleteSnapshot({ db: localDb, id: parseInt(req.params.id, 10) });
+}));
+
+router.post('/snapshots/wipe', handle(async () => {
+  return namedSnap.wipeAllSnapshots({ db: localDb });
+}));
+
 // ── TABLE_UPDATE_LOG (client-owned) ────────────────────────────────────────
 
 router.get('/update-log/schema', requireConfig, handle(req =>
@@ -269,6 +306,36 @@ router.post('/autosnapshot/trigger', requireConfig, handle(async () => {
   await autoSnapshot.triggerNow();
   return autoSnapshot.status();
 }));
+
+// SSE : diffuse les événements du poller en temps réel.
+// L'UI TablesPage s'abonne pour voir apparaître les snapshots dès qu'ils tombent,
+// sans polling. Le keep-alive envoie un commentaire toutes les 15 s pour
+// éviter les timeouts des proxies (Vite/nginx/CloudFlare).
+router.get('/autosnapshot/stream', (req, res) => {
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no' // désactive le buffering nginx si présent
+  });
+  res.flushHeaders?.();
+
+  const send = (event) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+
+  // Envoie l'état actuel à la connexion pour synchroniser le client
+  send({ type: 'hello', status: autoSnapshot.status() });
+
+  const unsub = autoSnapshot.subscribe(send);
+  const keepalive = setInterval(() => { try { res.write(':keepalive\n\n'); } catch (_) {} }, 15000);
+
+  req.on('close', () => {
+    clearInterval(keepalive);
+    unsub();
+    try { res.end(); } catch (_) {}
+  });
+});
 
 router.get('/dataflow-rows/history', requireConfig, handle(req => {
   const { folder, project, pkg, destination } = req.query;

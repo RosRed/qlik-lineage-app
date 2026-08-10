@@ -142,7 +142,7 @@ function buildGlobalLineage() {
         const key = qvdKey(st.outputPath || st.outputName);
         if (!key) continue;
         const q = ensure(key);
-        q.producers.push({ appId: app.id, appName: app.name, stream: app.stream || null, tableName: st.tableName, path: st.outputPath });
+        q.producers.push({ appId: app.id, qlikAppId: app.qlik_app_id || null, appName: app.name, stream: app.stream || null, tableName: st.tableName, path: st.outputPath });
         if (st.outputPath) q.paths.add(st.outputPath);
         summary.producedQvds.push(key);
       }
@@ -158,7 +158,7 @@ function buildGlobalLineage() {
         const key = qvdKey(src.path || src.name);
         if (!key) continue;
         const q = ensure(key);
-        q.consumers.push({ appId: app.id, appName: app.name, stream: app.stream || null, tables: src.usedBy || [], path: src.path });
+        q.consumers.push({ appId: app.id, qlikAppId: app.qlik_app_id || null, appName: app.name, stream: app.stream || null, tables: src.usedBy || [], path: src.path });
         if (src.path) q.paths.add(src.path);
         summary.consumedQvds.push(key);
       }

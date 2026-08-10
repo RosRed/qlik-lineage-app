@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Outlet, useOutletContext } from 'react-router-dom';
 import {
-  Server, RefreshCw, Settings, BarChart3, ListChecks, AlertOctagon, Table, Clock, FileText
+  Server, RefreshCw, Settings, BarChart3, ListChecks, AlertOctagon, Clock, FileText, Camera
 } from 'lucide-react';
-import { ssisApi } from '../api/qlikApi';
+import { ssisApi, cacheInvalidate } from '../api/qlikApi';
 import { PageHeader, SubTabs, Button, Spinner, ErrorNote } from '../components/ui/primitives';
 import SubTabLink from '../components/ui/SubTabLink';
 
@@ -38,7 +38,9 @@ export default function SsisLayout() {
           ? `Serveur : ${health.host}`
           : 'Aucune connexion — allez dans Réglages SSIS pour configurer'}
         actions={
-          <Button variant="ghost" onClick={load} title="Rafraîchir" aria-label="Rafraîchir">
+          <Button variant="ghost"
+            onClick={() => { cacheInvalidate('/api/ssis'); load(); }}
+            title="Rafraîchir (vide le cache SSIS)" aria-label="Rafraîchir">
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           </Button>
         }
@@ -47,7 +49,7 @@ export default function SsisLayout() {
           <SubTabLink to="." end icon={BarChart3} label="Dashboard" />
           <SubTabLink to="executions" icon={ListChecks} label="Exécutions" />
           <SubTabLink to="errors" icon={AlertOctagon} label="Erreurs" />
-          <SubTabLink to="tables" icon={Table} label="Tables (rows)" />
+          <SubTabLink to="snapshots" icon={Camera} label="Snapshots" />
           <SubTabLink to="update-log" icon={FileText} label="Rechargements" />
           <SubTabLink to="jobs" icon={Clock} label="Jobs Agent" />
           <SubTabLink to="settings" icon={Settings} label="Réglages" />

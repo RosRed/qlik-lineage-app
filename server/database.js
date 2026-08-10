@@ -97,6 +97,31 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_ssis_snapshots_lookup
     ON ssis_table_snapshots(server_key, database_name, schema_name, table_name, captured_at DESC);
 
+  -- Snapshots nommés (déclenchés à la demande, granularité société)
+  CREATE TABLE IF NOT EXISTS ssis_named_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    label TEXT NOT NULL,
+    description TEXT,
+    server_key TEXT NOT NULL,
+    database_name TEXT NOT NULL,
+    captured_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    table_count INTEGER DEFAULT 0,
+    row_count_total INTEGER DEFAULT 0,
+    duration_ms INTEGER DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS ssis_named_snapshot_rows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_id INTEGER NOT NULL REFERENCES ssis_named_snapshots(id) ON DELETE CASCADE,
+    schema_name TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    ref_societe TEXT,      -- NULL = total table (aucune colonne REF_SOCIETE)
+    row_count INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_named_snap_rows_lookup
+    ON ssis_named_snapshot_rows(snapshot_id, schema_name, table_name, ref_societe);
+
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,

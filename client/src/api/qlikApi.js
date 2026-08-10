@@ -1,3 +1,5 @@
+import { cachedGet, invalidate as cacheInvalidate } from '../lib/apiCache';
+
 const BASE = '/api';
 
 const json = async (res) => {
@@ -13,71 +15,96 @@ const json = async (res) => {
 const post = (url, body) =>
   fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(json);
 
+// Endpoints "chers" (>1s) cachés côté client avec stale-while-revalidate.
+// TTL généreux (5-10 min) : ce sont des données peu volatiles (structure du
+// serveur Qlik) qu'on ne veut pas ré-interroger à chaque navigation.
+const CACHED = (ttl, stale) => ({ ttl, stale });
+const CFG_HEAVY   = CACHED(5 * 60_000, 15 * 60_000);   // lineage global, tasks, governance
+const CFG_LIGHT   = CACHED(60_000, 5 * 60_000);        // config, health
+
 export const qlikApi = {
-  getConfig:  ()      => fetch(`${BASE}/qlik/config`).then(json),
-  saveConfig: (cfg)   => post(`${BASE}/qlik/config`, cfg),
+  getConfig:  ()      => cachedGet(`${BASE}/qlik/config`, CFG_LIGHT),
+  saveConfig: (cfg)   => post(`${BASE}/qlik/config`, cfg).then(r => { cacheInvalidate(`${BASE}/qlik/config`); return r; }),
   test:       ()      => post(`${BASE}/qlik/test`, {}),
   listApps:   ()      => fetch(`${BASE}/qlik/apps`).then(json),
   import:     (apps, analyzeMode) => post(`${BASE}/qlik/import`, { apps, analyzeMode }),
   importProgress: () => fetch(`${BASE}/qlik/import/progress`).then(json),
-  tasks:      (refresh) => fetch(`${BASE}/qlik/tasks${refresh ? '?refresh=1' : ''}`).then(json),
+  tasks:      (refresh) => refresh
+    ? fetch(`${BASE}/qlik/tasks?refresh=1`).then(json).then(r => { cacheInvalidate(`${BASE}/qlik/tasks`); return r; })
+    : cachedGet(`${BASE}/qlik/tasks`, CFG_HEAVY),
   tasksExportUrl: ()  => `${BASE}/qlik/tasks/export`,
-  governance: (refresh) => fetch(`${BASE}/qlik/governance${refresh ? '?refresh=1' : ''}`).then(json),
+  governance: (refresh) => refresh
+    ? fetch(`${BASE}/qlik/governance?refresh=1`).then(json).then(r => { cacheInvalidate(`${BASE}/qlik/governance`); return r; })
+    : cachedGet(`${BASE}/qlik/governance`, CFG_HEAVY),
   appsCleanup: (staleDays) => fetch(`${BASE}/qlik/apps/cleanup${staleDays ? `?staleDays=${staleDays}` : ''}`).then(json),
   appsCleanupExportUrl: (flaggedOnly) => `${BASE}/qlik/apps/cleanup/export${flaggedOnly ? '?flaggedOnly=1' : ''}`,
   connections: ()     => fetch(`${BASE}/qlik/connections`).then(json),
 };
 
 export const globalApi = {
-  getLineage:  () => fetch(`${BASE}/global/lineage`).then(json),
-  duplicates:  () => fetch(`${BASE}/global/duplicates`).then(json),
-  producers:   () => fetch(`${BASE}/global/producers`).then(json),
+  getLineage:  (force) => force
+    ? fetch(`${BASE}/global/lineage`).then(json).then(r => { cacheInvalidate(`${BASE}/global/lineage`); return r; })
+    : cachedGet(`${BASE}/global/lineage`, CFG_HEAVY),
+  duplicates:  () => cachedGet(`${BASE}/global/duplicates`, CFG_HEAVY),
+  producers:   () => cachedGet(`${BASE}/global/producers`, CFG_HEAVY),
   exportUrl:            () => `${BASE}/global/export`,
   exportFamiliesUrl:    () => `${BASE}/global/duplicates/export/families`,
   exportTwinsUrl:       () => `${BASE}/global/duplicates/export/twins`,
   exportProducersUrl:   () => `${BASE}/global/producers/export`,
 };
 
+// Cache SSIS — 2 min sur les vues de monitoring (données SSISDB peu volatiles
+// à l'échelle d'une navigation). Bouton "Rafraîchir" fait un force refresh.
+const SSIS_TTL = { ttl: 2 * 60_000, stale: 10 * 60_000 };
+const qs = (params) => new URLSearchParams(
+  Object.entries(params).filter(([, v]) => v !== null && v !== '' && v !== undefined)
+).toString();
+const cachedSsis = (path, force) => force
+  ? fetch(`${BASE}/ssis/${path}`).then(json).then(r => { cacheInvalidate(`${BASE}/ssis/${path.split('?')[0]}`); return r; })
+  : cachedGet(`${BASE}/ssis/${path}`, SSIS_TTL);
+
 export const ssisApi = {
   getConfig:  ()    => fetch(`${BASE}/ssis/config`).then(json),
   saveConfig: (cfg) => post(`${BASE}/ssis/config`, cfg),
   test:       (cfg = {}) => post(`${BASE}/ssis/test`, cfg),
   health:     ()    => fetch(`${BASE}/ssis/health`).then(json),
-  dashboard:  (days = 7) => fetch(`${BASE}/ssis/dashboard?days=${days}`).then(json),
-  executions: (params = {}) => {
-    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== null && v !== '' && v !== undefined)).toString();
-    return fetch(`${BASE}/ssis/executions${qs ? `?${qs}` : ''}`).then(json);
-  },
-  executionDetail: (id) => fetch(`${BASE}/ssis/executions/${encodeURIComponent(id)}`).then(json),
-  errors:     (days = 7, limit = 200) => fetch(`${BASE}/ssis/errors?days=${days}&limit=${limit}`).then(json),
-  folders:    () => fetch(`${BASE}/ssis/folders`).then(json),
-  databases:  () => fetch(`${BASE}/ssis/databases`).then(json),
-  tablesStatus: (database) => fetch(`${BASE}/ssis/tables/status?database=${encodeURIComponent(database)}`).then(json),
-  snapshot:   (database) => post(`${BASE}/ssis/tables/snapshot`, { database }),
+  dashboard:  (days = 7, force) => cachedSsis(`dashboard?days=${days}`, force),
+  executions: (params = {}, force) => cachedSsis(`executions?${qs(params)}`, force),
+  executionDetail: (id) => cachedGet(`${BASE}/ssis/executions/${encodeURIComponent(id)}`, SSIS_TTL),
+  errors:     (days = 7, limit = 200, force) => cachedSsis(`errors?days=${days}&limit=${limit}`, force),
+  folders:    () => cachedGet(`${BASE}/ssis/folders`, { ttl: 10 * 60_000, stale: 60 * 60_000 }),
+  databases:  () => cachedGet(`${BASE}/ssis/databases`, { ttl: 10 * 60_000, stale: 60 * 60_000 }),
+  tablesStatus: (database, force) => cachedSsis(`tables/status?database=${encodeURIComponent(database)}`, force),
+  snapshot:   (database) => post(`${BASE}/ssis/tables/snapshot`, { database })
+                             .then(r => { cacheInvalidate(`${BASE}/ssis/tables/status`); return r; }),
   tableHistory: (database, schema, table, limit = 100) =>
-    fetch(`${BASE}/ssis/tables/history?database=${encodeURIComponent(database)}&schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(table)}&limit=${limit}`).then(json),
-  autosnapshotStatus: () => fetch(`${BASE}/ssis/autosnapshot`).then(json),
+    cachedGet(`${BASE}/ssis/tables/history?database=${encodeURIComponent(database)}&schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(table)}&limit=${limit}`, SSIS_TTL),
+  autosnapshotStatus: () => fetch(`${BASE}/ssis/autosnapshot`).then(json), // léger, pas de cache — état temps réel
   autosnapshotSet: (enabled, database) => post(`${BASE}/ssis/autosnapshot`, { enabled, database }),
   autosnapshotTrigger: () => post(`${BASE}/ssis/autosnapshot/trigger`, {}),
-  updateLogSchema: (database) => fetch(`${BASE}/ssis/update-log/schema?database=${encodeURIComponent(database)}`).then(json),
-  updateLog: (params = {}) => {
-    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== null && v !== '' && v !== undefined)).toString();
-    return fetch(`${BASE}/ssis/update-log${qs ? `?${qs}` : ''}`).then(json);
-  },
-  societes: (database) => fetch(`${BASE}/ssis/societes?database=${encodeURIComponent(database)}`).then(json),
-  updateLogSummary: (params = {}) => {
-    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== null && v !== '' && v !== undefined)).toString();
-    return fetch(`${BASE}/ssis/update-log/summary${qs ? `?${qs}` : ''}`).then(json);
-  },
-  updateLogRuns: (params = {}) => {
-    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== null && v !== '' && v !== undefined)).toString();
-    return fetch(`${BASE}/ssis/update-log/runs${qs ? `?${qs}` : ''}`).then(json);
-  },
+  updateLogSchema: (database) => cachedGet(`${BASE}/ssis/update-log/schema?database=${encodeURIComponent(database)}`, { ttl: 10 * 60_000, stale: 60 * 60_000 }),
+  updateLog: (params = {}, force) => cachedSsis(`update-log?${qs(params)}`, force),
+  societes: (database) => cachedGet(`${BASE}/ssis/societes?database=${encodeURIComponent(database)}`, { ttl: 10 * 60_000, stale: 60 * 60_000 }),
+  updateLogSummary: (params = {}, force) => cachedSsis(`update-log/summary?${qs(params)}`, force),
+  updateLogRuns: (params = {}, force) => cachedSsis(`update-log/runs?${qs(params)}`, force),
   deleteSnapshots: (params) => {
-    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
-    return fetch(`${BASE}/ssis/tables/snapshots${qs ? `?${qs}` : ''}`, { method: 'DELETE' }).then(json);
+    const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+    return fetch(`${BASE}/ssis/tables/snapshots${q ? `?${q}` : ''}`, { method: 'DELETE' })
+      .then(json).then(r => { cacheInvalidate(`${BASE}/ssis/tables`); return r; });
   },
+  reconnect: () => post(`${BASE}/ssis/reconnect`, {}).then(r => { cacheInvalidate(`${BASE}/ssis`); return r; }),
+
+  // Snapshots nommés à la demande (grain table × société)
+  namedSnapshotList: (database) => cachedGet(`${BASE}/ssis/named-snapshots${database ? `?database=${encodeURIComponent(database)}` : ''}`, { ttl: 30_000, stale: 5 * 60_000 }),
+  namedSnapshotCreate: (payload) => post(`${BASE}/ssis/named-snapshots`, payload).then(r => { cacheInvalidate(`${BASE}/ssis/named-snapshots`); return r; }),
+  namedSnapshotDetail: (id) => cachedGet(`${BASE}/ssis/named-snapshots/${id}`, { ttl: 5 * 60_000, stale: 60 * 60_000 }),
+  namedSnapshotDelete: (id) => fetch(`${BASE}/ssis/named-snapshots/${id}`, { method: 'DELETE' }).then(json).then(r => { cacheInvalidate(`${BASE}/ssis/named-snapshots`); return r; }),
+  namedSnapshotCompare: (aId, bId) => cachedGet(`${BASE}/ssis/named-snapshots/compare?a=${aId}&b=${bId}`, { ttl: 5 * 60_000, stale: 60 * 60_000 }),
+  wipeAllSnapshots: () => post(`${BASE}/ssis/snapshots/wipe`, {}).then(r => { cacheInvalidate(`${BASE}/ssis`); return r; })
 };
+
+// Ré-export pour permettre à une page de vider un chemin précis (bouton Rafraîchir)
+export { cacheInvalidate };
 
 export const adminApi = {
   reset: () => post(`${BASE}/admin/reset`, {}),

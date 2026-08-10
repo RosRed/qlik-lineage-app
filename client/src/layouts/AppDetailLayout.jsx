@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet, useParams, useOutletContext, Link } from 'react-router-dom';
 import {
   LayoutGrid, Database, GitBranch, Network, MessageSquare, FileCode,
-  Zap, Brain, HardDrive, Loader2, ArrowLeft, Boxes
+  Zap, Brain, HardDrive, Loader2, ArrowLeft, Boxes, Clock
 } from 'lucide-react';
 import { useAppsList } from '../context/AppsContext';
 import { useAppWorkspace } from '../hooks/useAppWorkspace';
@@ -111,6 +111,11 @@ export default function AppDetailLayout() {
                     : <><Brain size={11} /> Claude</>}
               </Badge>
             )}
+            {/* Lien Apps → Tâches : jump vers /tasks préfiltré sur l'app courante */}
+            <Link to={`/tasks?app=${encodeURIComponent(app.name)}`}
+                  title="Voir les tâches de reload de cette app">
+              <Button variant="ghost" icon={Clock}>Tâches</Button>
+            </Link>
             <AnalyzeControls
               analyzeMode={analyzeMode}
               setAnalyzeMode={setAnalyzeMode}

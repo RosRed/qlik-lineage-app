@@ -38,7 +38,7 @@ import SsisPlaceholderPage from './pages/ssis/SsisPlaceholderPage.jsx';
 import SsisDashboardPage from './pages/ssis/DashboardPage.jsx';
 import SsisExecutionsPage from './pages/ssis/ExecutionsPage.jsx';
 import SsisErrorsPage from './pages/ssis/ErrorsPage.jsx';
-import SsisTablesPage from './pages/ssis/TablesPage.jsx';
+import SsisNamedSnapshotsPage from './pages/ssis/NamedSnapshotsPage.jsx';
 import SsisUpdateLogPage from './pages/ssis/UpdateLogPage.jsx';
 
 /*
@@ -96,7 +96,7 @@ export default function App() {
           <Route index element={<SsisDashboardPage />} />
           <Route path="executions" element={<SsisExecutionsPage />} />
           <Route path="errors" element={<SsisErrorsPage />} />
-          <Route path="tables" element={<SsisTablesPage />} />
+          <Route path="snapshots" element={<SsisNamedSnapshotsPage />} />
           <Route path="update-log" element={<SsisUpdateLogPage />} />
           <Route path="jobs" element={<SsisPlaceholderPage
             title="Jobs SQL Server Agent"

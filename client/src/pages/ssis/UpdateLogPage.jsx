@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Loader2, RefreshCw, FileWarning, AlertTriangle, TrendingUp, TrendingDown,
-  Minus, Zap, Table, ListTree, FileText, ChevronDown, ChevronRight
+  Minus, Zap, Table, ListTree, FileText, ChevronDown, ChevronRight, HeartPulse
 } from 'lucide-react';
 import { ssisApi } from '../../api/qlikApi';
 import { PageBody, Card, Select, SearchInput, Button, ErrorNote, EmptyState } from '../../components/ui/primitives';
@@ -362,6 +362,175 @@ function RunsView({ database, days, refSoc }) {
   );
 }
 
+// ─── Vue Santé société ──────────────────────────────────────────────────────
+
+function HealthView({ database, days, refSoc }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [expanded, setExpanded] = useState(new Set());
+  const [sort, setSort] = useState('score_asc'); // score_asc = pires en tête
+
+  useEffect(() => {
+    if (!database) return;
+    setLoading(true); setError(null);
+    ssisApi.updateLogSummary({ database, days, ref_societe: refSoc })
+      .then(setData)
+      .catch(e => setError(e.error || e.message))
+      .finally(() => setLoading(false));
+  }, [database, days, refSoc]);
+
+  // Agrégation par société : compte total, anomalies, score de santé.
+  const societes = useMemo(() => {
+    if (!data) return [];
+    const byRef = new Map();
+    for (const r of data) {
+      const key = r.refSociete;
+      if (!byRef.has(key)) byRef.set(key, {
+        refSociete: key, name: r.societeName || key,
+        total: 0, ok: 0, critical: 0, warning: 0, info: 0,
+        anomalies: [], totalRows: 0, worstTables: []
+      });
+      const soc = byRef.get(key);
+      soc.total++;
+      soc[r.severity]++;
+      soc.totalRows += (r.lastCount || 0);
+      if (r.severity !== 'ok') {
+        soc.anomalies.push({ table: r.table, severity: r.severity, anomalies: r.anomalies, delta: r.delta, deltaPct: r.deltaPct });
+      }
+    }
+
+    const list = [...byRef.values()].map(s => {
+      // Score de santé sur 100 : 100 - (crit×5 + warn×2 + info×0.5)*100/total, borné [0,100]
+      const penalty = (s.critical * 5 + s.warning * 2 + s.info * 0.5) * 100 / Math.max(1, s.total);
+      const score = Math.max(0, Math.min(100, 100 - penalty));
+      // Top 5 pires tables (par sévérité puis |delta|)
+      const rank = { critical: 3, warning: 2, info: 1 };
+      const worst = s.anomalies
+        .sort((a, b) => (rank[b.severity] - rank[a.severity]) || Math.abs(b.delta || 0) - Math.abs(a.delta || 0))
+        .slice(0, 5);
+      return { ...s, score, worstTables: worst };
+    });
+
+    if (sort === 'score_asc') list.sort((a, b) => a.score - b.score);
+    else if (sort === 'score_desc') list.sort((a, b) => b.score - a.score);
+    else if (sort === 'anomalies_desc') list.sort((a, b) => (b.critical + b.warning) - (a.critical + a.warning));
+    else if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
+    return list;
+  }, [data, sort]);
+
+  const toggle = (ref) => {
+    const s = new Set(expanded);
+    s.has(ref) ? s.delete(ref) : s.add(ref);
+    setExpanded(s);
+  };
+
+  const scoreColor = (score) => {
+    if (score >= 90) return 'text-emerald-400';
+    if (score >= 70) return 'text-yellow-400';
+    if (score >= 50) return 'text-orange-400';
+    return 'text-red-400';
+  };
+  const scoreBarColor = (score) => {
+    if (score >= 90) return 'bg-emerald-500';
+    if (score >= 70) return 'bg-yellow-500';
+    if (score >= 50) return 'bg-orange-500';
+    return 'bg-red-500';
+  };
+
+  if (error) return <ErrorNote>{error}</ErrorNote>;
+  if (loading && !data) return <div className="text-xs text-ink-muted"><Loader2 size={13} className="inline animate-spin mr-1" /> Chargement…</div>;
+  if (!data) return null;
+
+  return (
+    <>
+      <div className="flex items-center gap-2 mb-3">
+        <Select value={sort} onChange={setSort}>
+          <option value="score_asc">Tri : pires d'abord</option>
+          <option value="score_desc">Tri : meilleures d'abord</option>
+          <option value="anomalies_desc">Tri : + d'anomalies</option>
+          <option value="name">Tri : nom</option>
+        </Select>
+        <span className="ml-auto text-[11px] text-ink-faint">{societes.length} sociétés</span>
+      </div>
+
+      {societes.length === 0 ? (
+        <EmptyState icon={HeartPulse} title="Aucune donnée" description="Élargissez la fenêtre." />
+      ) : (
+        <div className="space-y-2">
+          {societes.map(soc => {
+            const open = expanded.has(soc.refSociete);
+            return (
+              <Card key={soc.refSociete} className="!py-0 !px-0 overflow-hidden">
+                <button onClick={() => toggle(soc.refSociete)}
+                  className="w-full flex items-center gap-4 px-4 py-3 hover:bg-raised/50 text-left">
+                  {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-ink">{soc.name}</span>
+                      <span className="text-[10px] text-ink-faint">({soc.refSociete})</span>
+                    </div>
+                    <div className="text-[11px] text-ink-muted mt-0.5">
+                      {soc.total} tables · {fmtRows(soc.totalRows)} rows
+                      {soc.critical > 0 && <span className="text-red-400"> · {soc.critical} critiques</span>}
+                      {soc.warning > 0 && <span className="text-yellow-400"> · {soc.warning} warnings</span>}
+                      {soc.info > 0    && <span className="text-orange-400"> · {soc.info} info</span>}
+                    </div>
+                  </div>
+                  {/* Barre de santé */}
+                  <div className="w-32 md:w-48 flex-shrink-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="flex-1 h-2 bg-raised rounded overflow-hidden">
+                        <div className={`h-full ${scoreBarColor(soc.score)} transition-all`}
+                          style={{ width: `${soc.score}%` }} />
+                      </div>
+                      <span className={`text-sm font-bold tabular-nums ${scoreColor(soc.score)}`}>
+                        {Math.round(soc.score)}
+                      </span>
+                    </div>
+                    <div className="text-[9px] text-ink-faint text-right uppercase tracking-wider">Score santé</div>
+                  </div>
+                </button>
+                {open && (
+                  <div className="border-t border-line bg-raised/30 px-4 py-3">
+                    {soc.worstTables.length === 0 ? (
+                      <p className="text-xs text-emerald-400">Aucune anomalie 🎉</p>
+                    ) : (
+                      <>
+                        <div className="text-[10px] uppercase tracking-wider text-ink-muted mb-2">
+                          Top {soc.worstTables.length} tables problématiques
+                        </div>
+                        <div className="space-y-1">
+                          {soc.worstTables.map((t, i) => (
+                            <div key={i} className="flex items-center gap-2 text-xs">
+                              <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
+                                t.severity === 'critical' ? 'bg-red-900/40 text-red-300' :
+                                t.severity === 'warning'  ? 'bg-yellow-900/40 text-yellow-300' :
+                                                            'bg-orange-900/40 text-orange-300'}`}>
+                                {t.severity}
+                              </span>
+                              <span className="font-mono text-info flex-1">{t.table}</span>
+                              <AnomalyBadges list={t.anomalies} />
+                              <span className={`font-mono tabular-nums text-[11px] ${fmtDelta(t.delta).cls}`}>
+                                {fmtDelta(t.delta).text}
+                                {t.deltaPct != null && <span className="text-[9px] text-ink-faint"> ({(t.deltaPct * 100).toFixed(0)}%)</span>}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── Vue Brute ───────────────────────────────────────────────────────────────
 
 function fmtCell(val) {
@@ -501,11 +670,13 @@ export default function UpdateLogPage() {
 
       <div className="flex items-center gap-2 mb-4">
         {tabBtn('summary', 'Résumé & anomalies', AlertTriangle)}
+        {tabBtn('health',  'Santé société',       HeartPulse)}
         {tabBtn('runs',    'Runs (batches)',      ListTree)}
         {tabBtn('raw',     'Log brut',            FileText)}
       </div>
 
       {tab === 'summary' && <SummaryView database={database} days={days} refSoc={refSoc} />}
+      {tab === 'health'  && <HealthView  database={database} days={days} refSoc={refSoc} />}
       {tab === 'runs'    && <RunsView    database={database} days={days} refSoc={refSoc} />}
       {tab === 'raw'     && <RawView     database={database} days={days} refSoc={refSoc} />}
     </PageBody>

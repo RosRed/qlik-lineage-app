@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Boxes, Plus, Pencil, Trash2, Check, X, Database, Loader2 } from 'lucide-react';
 import { useAppsList } from '../context/AppsContext';
 import {
@@ -17,8 +17,15 @@ const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-
 export default function AppsListPage() {
   const { apps, loading, createApp, renameApp, removeApp } = useAppsList();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [search, setSearch] = useState('');
+  // Préfiltre depuis l'URL : /apps?search=NomApp — permet la navigation
+  // depuis une tâche vers l'app correspondante.
+  const [search, setSearch] = useState(() => searchParams.get('search') || '');
+  useEffect(() => {
+    const q = searchParams.get('search');
+    if (q) setSearch(q);
+  }, [searchParams]);
   const [streamFilter, setStreamFilter] = useState('');
   const [stateFilter, setStateFilter] = useState('');
 

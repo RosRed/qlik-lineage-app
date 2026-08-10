@@ -27,10 +27,13 @@ export default function GlobalLayout() {
   const [showImport, setShowImport] = useState(false);
   const { loadApps } = useAppsList();
 
-  const load = useCallback(() => {
-    setLoading(true);
+  // load(force) : au montage on utilise le cache (SWR : renvoie l'ancien pendant
+  // le refresh en fond) ; le bouton "Rafraîchir" passe `force=true` pour
+  // court-circuiter le cache et re-fetcher.
+  const load = useCallback((force = false) => {
+    if (!force) setLoading(true);
     setError(null);
-    globalApi.getLineage()
+    globalApi.getLineage(force)
       .then(setData)
       .catch(e => setError(e.error || e.message || 'Erreur de chargement'))
       .finally(() => setLoading(false));
@@ -58,8 +61,8 @@ export default function GlobalLayout() {
             </a>
             <Button
               variant="ghost"
-              onClick={load}
-              title="Rafraîchir"
+              onClick={() => load(true)}
+              title="Rafraîchir (force)"
               aria-label="Rafraîchir les données"
             >
               <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
