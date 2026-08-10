@@ -97,6 +97,7 @@ export const ssisApi = {
   // Snapshots nommés à la demande (grain table × société)
   namedSnapshotList: (database) => cachedGet(`${BASE}/ssis/named-snapshots${database ? `?database=${encodeURIComponent(database)}` : ''}`, { ttl: 30_000, stale: 5 * 60_000 }),
   namedSnapshotCreate: (payload) => post(`${BASE}/ssis/named-snapshots`, payload).then(r => { cacheInvalidate(`${BASE}/ssis/named-snapshots`); return r; }),
+  namedSnapshotStatus: (id) => fetch(`${BASE}/ssis/named-snapshots/${id}/status`).then(json), // pas de cache — polling temps réel
   namedSnapshotDetail: (id) => cachedGet(`${BASE}/ssis/named-snapshots/${id}`, { ttl: 5 * 60_000, stale: 60 * 60_000 }),
   namedSnapshotDelete: (id) => fetch(`${BASE}/ssis/named-snapshots/${id}`, { method: 'DELETE' }).then(json).then(r => { cacheInvalidate(`${BASE}/ssis/named-snapshots`); return r; }),
   namedSnapshotCompare: (aId, bId) => cachedGet(`${BASE}/ssis/named-snapshots/compare?a=${aId}&b=${bId}`, { ttl: 5 * 60_000, stale: 60 * 60_000 }),

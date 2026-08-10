@@ -227,9 +227,14 @@ router.get('/named-snapshots', handle(async (req) => {
 
 router.post('/named-snapshots', requireConfig, handle(async (req) => {
   const { database, label, description } = req.body || {};
-  return namedSnap.captureNamedSnapshot(req.ssisConfig, {
+  return namedSnap.startNamedSnapshot(req.ssisConfig, {
     database, label, description, db: localDb
   });
+}));
+
+// Status léger (pour polling client pendant capture en background)
+router.get('/named-snapshots/:id/status', handle(async (req) => {
+  return namedSnap.getSnapshotStatus({ db: localDb, id: parseInt(req.params.id, 10) });
 }));
 
 router.get('/named-snapshots/compare', handle(async (req) => {

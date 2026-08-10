@@ -43,81 +43,116 @@ async function inspectSchema(cfg, database) {
 }
 
 /**
- * Exécute la capture pour un batch. Retourne les stats agrégées.
- * db = handle SQLite pour les inserts.
+ * Démarre une capture en background. Retourne immédiatement l'id + status.
+ * Le vrai travail (potentiellement plusieurs minutes) s'exécute ensuite
+ * sans bloquer la requête HTTP. Le client suit la progression via GET /:id.
  */
-async function captureNamedSnapshot(cfg, { database, label, description, db }) {
+async function startNamedSnapshot(cfg, { database, label, description, db }) {
   if (!NAME_RE.test(database)) throw Object.assign(new Error('Nom de base invalide'), { status: 400 });
   if (!label || !label.trim()) throw Object.assign(new Error('label requis'), { status: 400 });
 
-  const t0 = Date.now();
-  const pool = await ssisClient.getPool(cfg);
+  // Introspection en amont — permet de connaître le progress_total dès le POST.
+  // Si l'introspection elle-même échoue, on remonte l'erreur au client.
   const schema = await inspectSchema(cfg, database);
 
-  // Crée d'abord le batch pour avoir l'id
   const info = db.prepare(
-    'INSERT INTO ssis_named_snapshots (label, description, server_key, database_name) VALUES (?, ?, ?, ?)'
-  ).run(label.trim(), description || null, cfg.host, database);
+    "INSERT INTO ssis_named_snapshots (label, description, server_key, database_name, status, progress_total) VALUES (?, ?, ?, ?, 'running', ?)"
+  ).run(label.trim(), description || null, cfg.host, database, schema.size);
   const snapshotId = info.lastInsertRowid;
 
+  // Lance le travail sans await — la requête HTTP retourne tout de suite.
+  // Toute exception est captée pour mettre à jour le status en 'failed'.
+  setImmediate(() => runCaptureInBackground(cfg, snapshotId, database, schema, db));
+
+  return { snapshotId, status: 'running', tableCount: 0, totalRows: 0, progressTotal: schema.size };
+}
+
+/** Boucle de travail — un COUNT par table, insert au fil de l'eau. */
+async function runCaptureInBackground(cfg, snapshotId, database, schema, db) {
+  const t0 = Date.now();
   const insertRow = db.prepare(
     'INSERT INTO ssis_named_snapshot_rows (snapshot_id, schema_name, table_name, ref_societe, row_count) VALUES (?, ?, ?, ?, ?)'
+  );
+  const updateProgress = db.prepare(
+    'UPDATE ssis_named_snapshots SET progress_current = ?, table_count = ?, row_count_total = ? WHERE id = ?'
   );
 
   let totalRows = 0;
   let tableCount = 0;
+  let processed = 0;
   const errors = [];
 
-  // Pour chaque table, exécute la requête adaptée.
-  // Séquentiel (pas de parallélisme) pour ne pas saturer la connexion SQL.
-  for (const [key, cols] of schema.entries()) {
-    const [tSchema, tName] = key.split('.');
-    const hasRefSoc = [...cols].some(c => c.toLowerCase() === 'ref_societe');
+  try {
+    const pool = await ssisClient.getPool(cfg);
 
-    try {
-      let rows;
-      if (hasRefSoc) {
-        const q = `
-          USE [${database}];
-          SELECT REF_SOCIETE AS ref, COUNT_BIG(*) AS n
-          FROM [${tSchema}].[${tName}]
-          GROUP BY REF_SOCIETE;
-        `;
-        const res = await pool.request().query(q);
-        rows = res.recordset;
-      } else {
-        // Compte total (peu utile pour comparaison société mais gardé pour la complétude)
-        const q = `USE [${database}]; SELECT COUNT_BIG(*) AS n FROM [${tSchema}].[${tName}];`;
-        const res = await pool.request().query(q);
-        rows = res.recordset.map(r => ({ ref: null, n: r.n }));
-      }
+    for (const [key, cols] of schema.entries()) {
+      const [tSchema, tName] = key.split('.');
+      const hasRefSoc = [...cols].some(c => c.toLowerCase() === 'ref_societe');
 
-      db.exec('BEGIN');
       try {
-        for (const r of rows) {
-          const n = Number(r.n);
-          insertRow.run(snapshotId, tSchema, tName, r.ref || null, n);
-          totalRows += n;
+        let rows;
+        if (hasRefSoc) {
+          const q = `
+            USE [${database}];
+            SELECT REF_SOCIETE AS ref, COUNT_BIG(*) AS n
+            FROM [${tSchema}].[${tName}]
+            GROUP BY REF_SOCIETE;
+          `;
+          const res = await pool.request().query(q);
+          rows = res.recordset;
+        } else {
+          const q = `USE [${database}]; SELECT COUNT_BIG(*) AS n FROM [${tSchema}].[${tName}];`;
+          const res = await pool.request().query(q);
+          rows = res.recordset.map(r => ({ ref: null, n: r.n }));
         }
-        db.exec('COMMIT');
-        tableCount++;
+
+        db.exec('BEGIN');
+        try {
+          for (const r of rows) {
+            const n = Number(r.n);
+            insertRow.run(snapshotId, tSchema, tName, r.ref || null, n);
+            totalRows += n;
+          }
+          db.exec('COMMIT');
+          tableCount++;
+        } catch (e) {
+          try { db.exec('ROLLBACK'); } catch (_) {}
+          throw e;
+        }
       } catch (e) {
-        try { db.exec('ROLLBACK'); } catch (_) {}
-        throw e;
+        errors.push({ table: key, error: e.message });
       }
-    } catch (e) {
-      // On note l'erreur et on continue avec les autres tables. Certaines vues
-      // système peuvent refuser COUNT_BIG même en sysadmin (rare).
-      errors.push({ table: key, error: e.message });
+
+      processed++;
+      // Mise à jour progress toutes les 10 tables pour ne pas hammer SQLite
+      if (processed % 10 === 0 || processed === schema.size) {
+        updateProgress.run(processed, tableCount, totalRows, snapshotId);
+      }
     }
+
+    const durationMs = Date.now() - t0;
+    const errorSummary = errors.length ? `${errors.length} erreur(s) : ${errors.slice(0, 3).map(e => e.table).join(', ')}${errors.length > 3 ? '…' : ''}` : null;
+    db.prepare(`
+      UPDATE ssis_named_snapshots
+      SET status = 'succeeded', table_count = ?, row_count_total = ?, duration_ms = ?,
+          progress_current = ?, error_message = ?
+      WHERE id = ?
+    `).run(tableCount, totalRows, durationMs, processed, errorSummary, snapshotId);
+    console.log(`[NamedSnapshot #${snapshotId}] terminé — ${tableCount}/${schema.size} tables · ${totalRows} rows · ${durationMs}ms`);
+  } catch (e) {
+    // Erreur fatale (connexion perdue, pool down…) — on marque failed
+    console.error(`[NamedSnapshot #${snapshotId}] échec :`, e.message);
+    db.prepare(`
+      UPDATE ssis_named_snapshots
+      SET status = 'failed', error_message = ?, duration_ms = ?
+      WHERE id = ?
+    `).run(e.message, Date.now() - t0, snapshotId);
   }
+}
 
-  const durationMs = Date.now() - t0;
-  db.prepare(
-    'UPDATE ssis_named_snapshots SET table_count = ?, row_count_total = ?, duration_ms = ? WHERE id = ?'
-  ).run(tableCount, totalRows, durationMs, snapshotId);
-
-  return { snapshotId, tableCount, totalRows, durationMs, errors };
+/** Ancienne API synchrone — gardée pour compatibilité éventuelle. */
+async function captureNamedSnapshot(cfg, opts) {
+  return startNamedSnapshot(cfg, opts);
 }
 
 /** Liste des batches (méta seulement, pas les rows). */
@@ -129,11 +164,25 @@ function listSnapshots({ db, serverKey, database }) {
   const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
   return db.prepare(`
     SELECT id, label, description, server_key, database_name, captured_at,
-           table_count, row_count_total, duration_ms
+           table_count, row_count_total, duration_ms,
+           COALESCE(status, 'succeeded') AS status, error_message,
+           progress_current, progress_total
     FROM ssis_named_snapshots
     ${where}
     ORDER BY captured_at DESC
   `).all(...params);
+}
+
+/** Status léger d'un snapshot (pour le polling client). */
+function getSnapshotStatus({ db, id }) {
+  const r = db.prepare(`
+    SELECT id, label, COALESCE(status, 'succeeded') AS status,
+           progress_current, progress_total,
+           table_count, row_count_total, duration_ms, error_message, captured_at
+    FROM ssis_named_snapshots WHERE id = ?
+  `).get(id);
+  if (!r) { const e = new Error('Snapshot non trouvé'); e.status = 404; throw e; }
+  return r;
 }
 
 /** Détail d'un snapshot avec ses rows (agrégés par table + par société). */
@@ -224,6 +273,7 @@ function compareSnapshots({ db, aId, bId }) {
 }
 
 module.exports = {
-  captureNamedSnapshot, listSnapshots, getSnapshot, deleteSnapshot,
+  startNamedSnapshot, captureNamedSnapshot,
+  listSnapshots, getSnapshot, getSnapshotStatus, deleteSnapshot,
   wipeAllSnapshots, compareSnapshots
 };

@@ -5,7 +5,7 @@ import {
   AlertCircle, FileWarning
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { ssisApi } from '../../api/qlikApi';
+import { ssisApi, cacheInvalidate } from '../../api/qlikApi';
 import { PageBody, Card, Select, SearchInput, Button, ErrorNote, EmptyState } from '../../components/ui/primitives';
 import { fmtTime } from './shared.jsx';
 import { useSsisContext } from '../../layouts/SsisLayout.jsx';
@@ -39,13 +39,14 @@ function fmtDuration(ms) {
 
 // ─── Capture d'un nouveau snapshot ──────────────────────────────────────────
 
-function CaptureForm({ databases, onDone }) {
+function CaptureForm({ databases, onDone, onRunningChange }) {
   const [database, setDatabase] = useState(
     databases.find(n => n.toLowerCase().includes('groupe')) || databases[0] || ''
   );
   const [label, setLabel] = useState('');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState(null); // { id, label, progress_current, progress_total }
 
   useEffect(() => {
     if (!database && databases.length) {
@@ -53,25 +54,54 @@ function CaptureForm({ databases, onDone }) {
     }
   }, [databases, database]);
 
+  // Signale au parent qu'une capture est en cours (utile pour afficher un
+  // indicateur global et déclencher un reload de la liste à la fin).
+  useEffect(() => { onRunningChange?.(running); }, [running, onRunningChange]);
+
   const submit = async () => {
     if (!label.trim()) { toast.error('Donnez un nom au snapshot'); return; }
     if (!database) { toast.error('Sélectionnez une base'); return; }
     setBusy(true);
-    const t = toast.loading('Capture en cours (peut prendre plusieurs minutes)…');
     try {
-      const res = await ssisApi.namedSnapshotCreate({ database, label: label.trim(), description: description.trim() || null });
-      toast.dismiss(t);
-      toast.success(`Capture terminée : ${res.tableCount} tables · ${fmtRows(res.totalRows)} rows · ${fmtDuration(res.durationMs)}`);
+      const started = await ssisApi.namedSnapshotCreate({ database, label: label.trim(), description: description.trim() || null });
+      toast.success(`Capture lancée en arrière-plan — ${started.progressTotal} tables à traiter`);
+      setRunning({ id: started.snapshotId, label: label.trim(), progressCurrent: 0, progressTotal: started.progressTotal });
       setLabel('');
       setDescription('');
-      onDone?.(res);
     } catch (e) {
-      toast.dismiss(t);
-      toast.error(e.error || e.message || 'Échec de la capture');
+      toast.error(e.error || e.message || 'Échec du démarrage');
     } finally {
       setBusy(false);
     }
   };
+
+  // Polling status pendant la capture en background — s'arrête dès qu'elle finit.
+  useEffect(() => {
+    if (!running?.id) return;
+    let stopped = false;
+    const tick = async () => {
+      if (stopped) return;
+      try {
+        const st = await ssisApi.namedSnapshotStatus(running.id);
+        if (st.status === 'running') {
+          setRunning(r => r ? { ...r, progressCurrent: st.progress_current || 0, progressTotal: st.progress_total || r.progressTotal } : r);
+        } else if (st.status === 'succeeded') {
+          toast.success(`« ${st.label} » — ${st.table_count} tables · ${fmtRows(st.row_count_total)} rows · ${fmtDuration(st.duration_ms)}`);
+          setRunning(null);
+          onDone?.(st);
+          return;
+        } else if (st.status === 'failed') {
+          toast.error(`Capture « ${st.label} » échouée : ${st.error_message || 'erreur inconnue'}`);
+          setRunning(null);
+          onDone?.(st);
+          return;
+        }
+      } catch (_) { /* réseau coupé ? on retente au prochain tick */ }
+      setTimeout(tick, 3000);
+    };
+    setTimeout(tick, 2000);
+    return () => { stopped = true; };
+  }, [running?.id]);
 
   const suggestLabel = (kind) => {
     const now = new Date();
@@ -116,11 +146,29 @@ function CaptureForm({ databases, onDone }) {
             className="w-full bg-raised border border-line rounded px-3 py-1.5 text-sm text-ink focus:outline-none focus:border-accent" />
         </div>
       </div>
-      <div className="mt-3">
-        <Button variant="primary" onClick={submit} disabled={busy || !label.trim() || !database} icon={busy ? Loader2 : Plus}>
-          {busy ? 'Capture en cours…' : 'Lancer la capture'}
+      <div className="mt-3 flex items-center gap-3">
+        <Button variant="primary" onClick={submit}
+          disabled={busy || !!running || !label.trim() || !database}
+          icon={busy ? Loader2 : Plus}>
+          {busy ? 'Démarrage…' : running ? 'Capture en cours en arrière-plan…' : 'Lancer la capture'}
         </Button>
+        {running && (
+          <div className="flex-1 flex items-center gap-2 text-xs">
+            <div className="flex-1 h-2 bg-raised rounded overflow-hidden">
+              <div className="h-full bg-accent transition-all"
+                   style={{ width: `${Math.round((running.progressCurrent / Math.max(1, running.progressTotal)) * 100)}%` }} />
+            </div>
+            <span className="text-ink-muted tabular-nums whitespace-nowrap">
+              {running.progressCurrent} / {running.progressTotal} tables
+            </span>
+          </div>
+        )}
       </div>
+      {running && (
+        <p className="text-[11px] text-ink-faint mt-2">
+          Vous pouvez fermer cet onglet ou naviguer ailleurs — la capture continue côté serveur.
+        </p>
+      )}
     </Card>
   );
 }
@@ -151,18 +199,37 @@ function SnapshotList({ snapshots, selectedA, selectedB, onSelectA, onSelectB, o
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {snapshots.map(s => (
-              <tr key={s.id} className={`hover:bg-raised/60 ${
-                selectedA === s.id ? 'bg-blue-950/30' : ''}${selectedB === s.id ? ' bg-orange-950/30' : ''}`}>
+            {snapshots.map(s => {
+              const isRunning = s.status === 'running';
+              const isFailed = s.status === 'failed';
+              const canCompare = !isRunning && !isFailed;
+              const rowBg =
+                selectedA === s.id ? 'bg-blue-950/30' :
+                selectedB === s.id ? 'bg-orange-950/30' :
+                isRunning ? 'bg-emerald-950/20' :
+                isFailed  ? 'bg-red-950/20' : '';
+              return (
+              <tr key={s.id} className={`hover:bg-raised/60 ${rowBg}`}>
                 <td className="py-2 px-3">
                   <input type="radio" name="a" checked={selectedA === s.id}
+                    disabled={!canCompare} title={canCompare ? '' : 'Snapshot en cours ou en échec'}
                     onChange={() => onSelectA(s.id)} />
                 </td>
                 <td className="py-2 px-3">
                   <input type="radio" name="b" checked={selectedB === s.id}
+                    disabled={!canCompare} title={canCompare ? '' : 'Snapshot en cours ou en échec'}
                     onChange={() => onSelectB(s.id)} />
                 </td>
-                <td className="py-2 px-3 font-mono text-info">{s.label}</td>
+                <td className="py-2 px-3 font-mono text-info">
+                  {isRunning && <span className="mr-1 inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Capture en cours" />}
+                  {isFailed  && <span className="mr-1 inline-block w-2 h-2 rounded-full bg-red-500" title={s.error_message || 'Échec'} />}
+                  {s.label}
+                  {isRunning && s.progress_total > 0 && (
+                    <span className="ml-2 text-[10px] text-ink-muted tabular-nums">
+                      {s.progress_current || 0} / {s.progress_total}
+                    </span>
+                  )}
+                </td>
                 <td className="py-2 px-3 text-ink-muted text-[11px]">{s.database_name}</td>
                 <td className="py-2 px-3 text-[11px]">{fmtTime(s.captured_at)}</td>
                 <td className="py-2 px-3 text-right tabular-nums">{s.table_count}</td>
@@ -178,7 +245,8 @@ function SnapshotList({ snapshots, selectedA, selectedB, onSelectA, onSelectB, o
                   </button>
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>
@@ -336,8 +404,10 @@ export default function NamedSnapshotsPage() {
   const [selectedB, setSelectedB] = useState(null);
   const [mode, setMode] = useState('list'); // list | compare
 
-  const load = () => {
+  const load = (fresh = false) => {
     setLoading(true); setError(null);
+    // Invalide le cache si on veut forcer un refresh (polling pendant capture)
+    if (fresh) cacheInvalidate('/api/ssis/named-snapshots');
     ssisApi.namedSnapshotList()
       .then(setSnapshots)
       .catch(e => setError(e.error || e.message))
@@ -350,6 +420,17 @@ export default function NamedSnapshotsPage() {
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [health?.configured]);
+
+  // Auto-refresh de la liste dès qu'un snapshot en cours est présent.
+  // Utile si l'utilisateur navigue ailleurs puis revient sur la page pendant
+  // une capture longue lancée précédemment : la liste montre l'avancement.
+  const hasRunning = snapshots.some(s => s.status === 'running');
+  useEffect(() => {
+    if (!hasRunning) return;
+    const t = setInterval(() => load(true), 4000);
+    return () => clearInterval(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasRunning]);
 
   const wipe = async () => {
     if (!window.confirm('Supprimer TOUS les snapshots (nommés + auto) ? Cette action est irréversible.')) return;

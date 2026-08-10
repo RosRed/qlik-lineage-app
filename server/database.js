@@ -174,6 +174,12 @@ const migrations = [
   'ALTER TABLE ssis_config ADD COLUMN autosnapshot_enabled INTEGER DEFAULT 0',
   'ALTER TABLE ssis_config ADD COLUMN autosnapshot_database TEXT',
   'ALTER TABLE ssis_config ADD COLUMN autosnapshot_last_exec_id INTEGER',
+  // Statut du snapshot nommé (fire-and-forget) — anciens rows restent NULL,
+  // le service les remonte comme 'succeeded' pour la compatibilité.
+  "ALTER TABLE ssis_named_snapshots ADD COLUMN status TEXT",
+  'ALTER TABLE ssis_named_snapshots ADD COLUMN error_message TEXT',
+  'ALTER TABLE ssis_named_snapshots ADD COLUMN progress_current INTEGER',
+  'ALTER TABLE ssis_named_snapshots ADD COLUMN progress_total INTEGER',
   'ALTER TABLE analyses ADD COLUMN script_hash TEXT',
   'ALTER TABLE analyses ADD COLUMN analyze_mode TEXT DEFAULT \'claude\'',
   'ALTER TABLE chat_messages ADD COLUMN source TEXT DEFAULT \'claude\'',
