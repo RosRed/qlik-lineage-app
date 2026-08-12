@@ -4,12 +4,14 @@ import {
   Database, Download, CheckCircle2, XCircle, CalendarClock, Link2,
   Wrench, HelpCircle, Boxes, AlertTriangle
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { globalApi } from '../../api/qlikApi';
 import {
   PageBody, StatCard, Badge, SearchInput, Select, Button, Spinner,
   EmptyState, ErrorNote
 } from '../../components/ui/primitives';
 import { QvdStatusBadge } from '../../components/global/bits.jsx';
+import { downloadAuthed } from '../../lib/downloadAuthed';
 
 /*
  * Vue « qui produit ce QVD » : le format le plus court possible.
@@ -241,9 +243,11 @@ export default function ProducteursPage() {
           {filtered.length} / {flat.length} ligne{flat.length > 1 ? 's' : ''}
         </span>
         <div className="flex-1" />
-        <a href={globalApi.exportProducersUrl()} download>
-          <Button icon={Download}>Export Excel</Button>
-        </a>
+        <Button icon={Download}
+          onClick={() => downloadAuthed(globalApi.exportProducersUrl(), { filename: 'producteurs.csv' })
+            .catch(e => toast.error(e.error || e.message || 'Échec du téléchargement'))}>
+          Export Excel
+        </Button>
       </div>
 
       {filtered.length === 0 ? (

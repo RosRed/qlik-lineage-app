@@ -3,7 +3,9 @@ import {
   RefreshCw, Loader2, ShieldCheck, Search, Boxes, Plug, UserX, Database, ClipboardList, AlertTriangle,
   Copy, Download, X, Filter
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { qlikApi } from '../api/qlikApi';
+import { downloadAuthed } from '../lib/downloadAuthed';
 
 const APP_FLAG_META = {
   jamais_rechargee:    { label: 'Jamais rechargée',    cls: 'bg-red-900/40 text-red-400' },
@@ -153,10 +155,12 @@ function AppsAudit({ audit }) {
         </label>
         <span className="text-[10px] text-gray-600">{filtered.length} / {audit.apps.length} apps</span>
         <div className="flex-1" />
-        <a href={exportHref} download
+        <button type="button"
+          onClick={() => downloadAuthed(exportHref, { filename: `apps-cleanup${onlyFlagged ? '-flagged' : ''}.csv` })
+            .catch(e => toast.error(e.error || e.message || 'Échec du téléchargement'))}
           className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-300 rounded border border-emerald-800/50">
           <Download size={11} /> Export CSV
-        </a>
+        </button>
       </div>
 
       {/* Ligne 2 : filtres avances */}

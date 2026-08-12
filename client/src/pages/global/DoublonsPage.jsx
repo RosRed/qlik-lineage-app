@@ -4,11 +4,16 @@ import {
   Copy, GitFork, ChevronDown, ChevronRight, Layers, AlertTriangle,
   FileWarning, ArrowRight, Download
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { globalApi } from '../../api/qlikApi';
 import {
   PageBody, StatCard, Badge, SearchInput, Spinner, EmptyState, ErrorNote, Button
 } from '../../components/ui/primitives';
 import { QvdStatusBadge } from '../../components/global/bits.jsx';
+import { downloadAuthed } from '../../lib/downloadAuthed';
+
+const dl = (urlGetter, filename) => () =>
+  downloadAuthed(urlGetter(), { filename }).catch(e => toast.error(e.error || e.message || 'Échec du téléchargement'));
 
 /*
  * Analyse dédiée aux doublons du lineage.
@@ -136,9 +141,7 @@ function FamiliesSection({ families }) {
           {filtered.length} / {families.length} famille{families.length > 1 ? 's' : ''}
         </span>
         <div className="flex-1" />
-        <a href={globalApi.exportFamiliesUrl()} download>
-          <Button icon={Download}>Export Excel</Button>
-        </a>
+        <Button icon={Download} onClick={dl(globalApi.exportFamiliesUrl, 'doublons-familles.csv')}>Export Excel</Button>
       </div>
 
       {filtered.length === 0 ? (
@@ -301,9 +304,7 @@ function TwinsSection({ twins }) {
           {filtered.length} / {twins.length} paire{twins.length > 1 ? 's' : ''}
         </span>
         <div className="flex-1" />
-        <a href={globalApi.exportTwinsUrl()} download>
-          <Button icon={Download}>Export Excel</Button>
-        </a>
+        <Button icon={Download} onClick={dl(globalApi.exportTwinsUrl, 'doublons-paires.csv')}>Export Excel</Button>
       </div>
 
       {filtered.length === 0 ? (

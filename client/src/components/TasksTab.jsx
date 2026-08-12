@@ -3,7 +3,9 @@ import {
   RefreshCw, Loader2, CalendarClock, Search, ChevronDown, ChevronRight,
   Download, ListTree, ClipboardList, Clock
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { qlikApi } from '../api/qlikApi';
+import { downloadAuthed } from '../lib/downloadAuthed';
 
 const PROBLEM_META = {
   app_supprimee:           { label: 'App supprimée',         cls: 'bg-red-900/40 text-red-300' },
@@ -431,10 +433,13 @@ function CleanupView({ data }) {
           </button>
         )}
         <div className="flex-1" />
-        <a href={qlikApi.tasksExportUrl()}
+        <button
+          type="button"
+          onClick={() => downloadAuthed(qlikApi.tasksExportUrl(), { filename: 'tasks.csv' })
+            .catch(e => toast.error(e.error || e.message || 'Échec du téléchargement'))}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-200 rounded">
           <Download size={12} /> Export CSV
-        </a>
+        </button>
       </div>
 
       {/* Table */}

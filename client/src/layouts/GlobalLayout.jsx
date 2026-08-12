@@ -4,11 +4,13 @@ import {
   Globe, RefreshCw, Download, Server, BarChart3, Database,
   AlertTriangle, Boxes, Network, Copy, CalendarClock
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { globalApi } from '../api/qlikApi';
 import { useAppsList } from '../context/AppsContext';
 import QlikImportModal from '../components/QlikImportModal.jsx';
 import { PageHeader, SubTabs, Button, Spinner, ErrorNote } from '../components/ui/primitives';
 import SubTabLink from '../components/ui/SubTabLink';
+import { downloadAuthed } from '../lib/downloadAuthed';
 
 /*
  * Lineage inter-applications : /global/*
@@ -56,9 +58,11 @@ export default function GlobalLayout() {
             <Button variant="primary" icon={Server} onClick={() => setShowImport(true)}>
               Importer du serveur Qlik
             </Button>
-            <a href={globalApi.exportUrl()} download>
-              <Button icon={Download}>CSV</Button>
-            </a>
+            <Button icon={Download}
+              onClick={() => downloadAuthed(globalApi.exportUrl(), { filename: 'lineage-global.csv' })
+                .catch(e => toast.error(e.error || e.message || 'Échec du téléchargement'))}>
+              CSV
+            </Button>
             <Button
               variant="ghost"
               onClick={() => load(true)}
