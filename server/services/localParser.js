@@ -243,11 +243,32 @@ const CONTROL_LABELS = new Set([
 
 /** Extrait le label "Nom:" en tête d'instruction (même ligne que LOAD acceptée) */
 function extractLabel(text) {
-  const m = text.match(/^\s*(\[([^\]]+)\]|([A-Za-z_][A-Za-z0-9._ -]{0,80}?))\s*:(?![=\\/])/);
+  // Trois formes acceptées : [Nom]:, "Nom":, Nom:
+  const m = text.match(/^\s*(\[([^\]]+)\]|"([^"]+)"|([A-Za-z_][A-Za-z0-9._ -]{0,80}?))\s*:(?![=\\/])/);
   if (!m) return { label: null, rest: text };
-  const name = cleanName(m[2] || m[3]);
+  const name = cleanName(m[2] || m[3] || m[4]);
   if (!name || CONTROL_LABELS.has(name.toUpperCase())) return { label: null, rest: text };
   return { label: name, rest: text.slice(m[0].length) };
+}
+
+/**
+ * Retire les affectations orphelines en tête d'instruction — `vX=TODAY()` sans
+ * `LET`/`SET` ni `;` final : Qlik les tolère mais elles se retrouvent fusionnées
+ * avec l'instruction suivante par le splitter, cassant l'extraction du label et
+ * des préfixes qui suivent.
+ */
+function stripOrphanAssignments(text) {
+  let t = text;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const m = t.match(/^\s*([A-Za-z_]\w*)\s*=\s*[^;\n]*(?:\([^)]*\))?[^;\n]*(?=\n)/);
+    if (!m) break;
+    const kw = m[1].toUpperCase();
+    // Un vrai SET/LET est traité en amont ; ne jamais les ingérer ici
+    if (kw === 'SET' || kw === 'LET') break;
+    t = t.slice(m[0].length);
+  }
+  return t;
 }
 
 /** Extrait les préfixes avant LOAD/SELECT : mapping, concatenate, join, keep… */
@@ -614,7 +635,8 @@ function parseQlikScript(scriptContent, appName = 'Application') {
     if (!hasLoad) continue;
     if (inAccessSection) continue; // ne pas polluer le modèle avec la section access
 
-    const { label, rest: afterLabel } = extractLabel(text);
+    const cleaned = stripOrphanAssignments(text);
+    const { label, rest: afterLabel } = extractLabel(cleaned);
     const { prefixes, rest: body } = extractPrefixes(afterLabel);
     const parsed = parseLoadStatement(body);
     if (!parsed) continue;
