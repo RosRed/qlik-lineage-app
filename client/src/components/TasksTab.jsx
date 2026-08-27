@@ -58,6 +58,24 @@ function fmtDuration(ms) {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}min${s % 60 ? ` ${s % 60}s` : ''}`;
 }
 
+/** En-tête de colonne cliquable — affiche une flèche indiquant la colonne triée. */
+function SortableTh({ label, k, sortKey, sortDir, onSort }) {
+  const active = sortKey === k;
+  const arrow = active ? (sortDir === 'asc' ? '▲' : '▼') : '';
+  return (
+    <th className="py-2 pr-3">
+      <button
+        type="button"
+        onClick={() => onSort(k)}
+        className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-gray-300 ${active ? 'text-emerald-400' : 'text-gray-500'}`}
+      >
+        {label}
+        {arrow && <span className="text-[9px]">{arrow}</span>}
+      </button>
+    </th>
+  );
+}
+
 // ─── Vue Chaînes : arbre indenté ──────────────────────────────────────────────
 
 function ChainNode({ node, depth, parentBroken, feedsClientById }) {
@@ -291,6 +309,10 @@ function CleanupView({ data }) {
   const [publicationFilter, setPublicationFilter] = useState(''); // '' | 'published' | 'draft' | 'orphan'
   const [problemFilter, setProblemFilter] = useState(''); // clé de PROBLEM_META ou ''
   const [expanded, setExpanded] = useState(null);
+  // Tri des colonnes — cliquez sur un en-tête pour toggle asc/desc.
+  // Défaut : durée décroissante pour repérer d'un coup d'œil les tâches lentes.
+  const [sortKey, setSortKey] = useState('duration');
+  const [sortDir, setSortDir] = useState('desc');
 
   const streams = useMemo(
     () => [...new Set(data.tasks.map(t => t.stream || '(non publiée)'))].sort(),
@@ -330,6 +352,43 @@ function CleanupView({ data }) {
       return true;
     });
   }, [data, search, recoFilter, streamFilter, triggerFilter, publicationFilter, problemFilter]);
+
+  // Tri appliqué APRÈS le filtre — pour ne pas re-trier les 1000+ tâches
+  // à chaque frappe dans la barre de recherche.
+  const sorted = useMemo(() => {
+    const RECO_ORDER = { supprimer: 0, verifier: 1, conserver: 2 };
+    const getKey = (t) => {
+      switch (sortKey) {
+        case 'score':      return t.cleanupScore ?? 0;
+        case 'reco':       return RECO_ORDER[t.recommendation] ?? 99;
+        case 'name':       return (t.name || '').toLowerCase();
+        case 'app':        return (t.appName || '').toLowerCase();
+        case 'trigger':    return t.triggerType || 'manual';
+        case 'problems':   return (t.problems || []).length;
+        case 'lastRun':    return t.lastStart ? new Date(t.lastStart).getTime() : 0;
+        case 'duration':   return t.durationMs ?? 0;
+        default:           return 0;
+      }
+    };
+    const rows = [...filtered];
+    rows.sort((a, b) => {
+      const ka = getKey(a), kb = getKey(b);
+      if (ka < kb) return sortDir === 'asc' ? -1 : 1;
+      if (ka > kb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return rows;
+  }, [filtered, sortKey, sortDir]);
+
+  const toggleSort = (key) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      // Défaut : desc pour numérique (score/durée/problèmes/date), asc pour texte
+      setSortDir(['score', 'duration', 'problems', 'lastRun'].includes(key) ? 'desc' : 'asc');
+    }
+  };
 
   const s = data.stats;
   const applySafePreset = () => {
@@ -447,18 +506,18 @@ function CleanupView({ data }) {
         <thead className="sticky top-0 bg-gray-950">
           <tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-800">
             <th className="py-2 pr-2 w-4"></th>
-            <th className="py-2 pr-3">Score</th>
-            <th className="py-2 pr-3">Recommandation</th>
-            <th className="py-2 pr-3">Tâche</th>
-            <th className="py-2 pr-3">Application</th>
-            <th className="py-2 pr-3">Déclenchement</th>
-            <th className="py-2 pr-3">Problèmes</th>
-            <th className="py-2 pr-3">Dernier run</th>
-            <th className="py-2 pr-3">Durée</th>
+            <SortableTh label="Score"          k="score"    sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+            <SortableTh label="Recommandation" k="reco"     sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+            <SortableTh label="Tâche"          k="name"     sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+            <SortableTh label="Application"    k="app"      sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+            <SortableTh label="Déclenchement"  k="trigger"  sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+            <SortableTh label="Problèmes"      k="problems" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+            <SortableTh label="Dernier run"    k="lastRun"  sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+            <SortableTh label="Durée"          k="duration" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-800/50">
-          {filtered.map(t => (
+          {sorted.map(t => (
             <React.Fragment key={t.taskId}>
               <tr className={`hover:bg-gray-900/40 cursor-pointer ${!t.enabled ? 'opacity-60' : ''}`}
                 onClick={() => setExpanded(expanded === t.taskId ? null : t.taskId)}>
