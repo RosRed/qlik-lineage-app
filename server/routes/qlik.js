@@ -296,20 +296,26 @@ async function importOne(config, target, analyzeMode) {
   };
 
   // App locale existante (même qlik_app_id) → mise à jour ; sinon création
+  // Un import réel remet à zéro le flag `stale` et cadre `last_synced_reload`
+  // sur la valeur du serveur (référence pour les diffs futurs). Sort aussi la
+  // corbeille au passage — un import est une réactivation explicite.
   let local = db.prepare('SELECT * FROM apps WHERE qlik_app_id = ?').get(qlikAppId);
   if (local) {
     db.prepare(`UPDATE apps SET name = ?, stream = ?, published = ?, owner = ?, last_reload = ?,
         file_size = ?, created_date = ?, modified_date = ?, publish_time = ?, description = ?, tags = ?, custom_properties = ?,
+        stale = 0, last_synced_reload = ?, deleted_at = NULL,
         updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
       .run(name, stream || null, published ? 1 : 0, owner || null, lastReloadTime || null,
         meta.file_size, meta.created_date, meta.modified_date, meta.publish_time, meta.description, meta.tags, meta.custom_properties,
+        lastReloadTime || null,
         local.id);
   } else {
     const r = db.prepare(`INSERT INTO apps
-        (name, qlik_app_id, stream, origin, published, owner, last_reload,
+        (name, qlik_app_id, stream, origin, published, owner, last_reload, last_synced_reload,
          file_size, created_date, modified_date, publish_time, description, tags, custom_properties)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(name, qlikAppId, stream || null, 'qlik-server', published ? 1 : 0, owner || null, lastReloadTime || null,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(name, qlikAppId, stream || null, 'qlik-server', published ? 1 : 0, owner || null,
+        lastReloadTime || null, lastReloadTime || null,
         meta.file_size, meta.created_date, meta.modified_date, meta.publish_time, meta.description, meta.tags, meta.custom_properties);
     local = db.prepare('SELECT * FROM apps WHERE id = ?').get(r.lastInsertRowid);
   }
@@ -369,6 +375,61 @@ router.post('/import', (req, res) => {
   runImportJob(config, apps, analyzeMode); // pas de await : tourne en fond
 
   res.json({ started: true, total: apps.length });
+});
+
+// ── Synchronisation Qlik ↔ base locale ───────────────────────────────────────
+// Alternative au "tout supprimer + tout ré-importer" : diff par qlik_app_id.
+
+// GET /api/qlik/sync/preview — calcule le diff serveur ↔ local (rien de muté)
+router.get('/sync/preview', async (req, res) => {
+  const config = getConfig();
+  if (!config) return res.status(400).json({ error: 'Aucune configuration Qlik enregistrée' });
+  try {
+    const { computeDiff } = require('../services/qlikSyncService');
+    const serverApps = await clientFor(config).listApps(config);
+    res.json(computeDiff(serverApps));
+  } catch (e) {
+    console.error('[Sync/preview]', e.message);
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// POST /api/qlik/sync/apply — applique les mutations DB (soft delete + stale + réactivation)
+// L'import des nouvelles apps se fait ensuite via POST /api/qlik/import (workflow existant).
+router.post('/sync/apply', (req, res) => {
+  try {
+    const { applyPlan } = require('../services/qlikSyncService');
+    const { deletedLocalIds = [], updatedLocalIds = [], reactivateLocalIds = [] } = req.body || {};
+    const result = applyPlan({ deletedLocalIds, updatedLocalIds, reactivateLocalIds });
+    res.json(result);
+  } catch (e) {
+    console.error('[Sync/apply]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/qlik/sync/restore/:id — sort une app de la corbeille
+router.post('/sync/restore/:id', (req, res) => {
+  try {
+    const { restoreApp } = require('../services/qlikSyncService');
+    const ok = restoreApp(parseInt(req.params.id, 10));
+    if (!ok) return res.status(404).json({ error: 'App introuvable' });
+    res.json({ restored: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/qlik/sync/purge/:id — purge définitive (uniquement corbeille)
+router.delete('/sync/purge/:id', (req, res) => {
+  try {
+    const { purgeApp } = require('../services/qlikSyncService');
+    const ok = purgeApp(parseInt(req.params.id, 10));
+    if (!ok) return res.status(404).json({ error: 'App non purgeable (pas en corbeille)' });
+    res.json({ purged: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // GET /api/qlik/import/progress — état du job en cours (ou du dernier terminé)

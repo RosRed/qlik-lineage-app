@@ -199,6 +199,10 @@ const migrations = [
   'ALTER TABLE apps ADD COLUMN description TEXT',
   'ALTER TABLE apps ADD COLUMN tags TEXT',
   'ALTER TABLE apps ADD COLUMN custom_properties TEXT',
+  // Synchronisation Qlik : soft delete + flag "à ré-analyser"
+  'ALTER TABLE apps ADD COLUMN deleted_at DATETIME',
+  'ALTER TABLE apps ADD COLUMN stale INTEGER DEFAULT 0',
+  'ALTER TABLE apps ADD COLUMN last_synced_reload TEXT',
 ];
 for (const sql of migrations) {
   try { db.exec(sql); } catch (_) { /* colonne déjà présente */ }

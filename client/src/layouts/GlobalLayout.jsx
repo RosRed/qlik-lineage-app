@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { globalApi } from '../api/qlikApi';
 import { useAppsList } from '../context/AppsContext';
 import QlikImportModal from '../components/QlikImportModal.jsx';
+import QlikSyncModal from '../components/QlikSyncModal.jsx';
 import { PageHeader, SubTabs, Button, Spinner, ErrorNote } from '../components/ui/primitives';
 import SubTabLink from '../components/ui/SubTabLink';
 import { downloadAuthed } from '../lib/downloadAuthed';
@@ -27,6 +28,7 @@ export default function GlobalLayout() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showImport, setShowImport] = useState(false);
+  const [showSync, setShowSync] = useState(false);
   const { loadApps } = useAppsList();
 
   // load(force) : au montage on utilise le cache (SWR : renvoie l'ancien pendant
@@ -57,6 +59,9 @@ export default function GlobalLayout() {
           <>
             <Button variant="primary" icon={Server} onClick={() => setShowImport(true)}>
               Importer du serveur Qlik
+            </Button>
+            <Button icon={RefreshCw} onClick={() => setShowSync(true)} title="Diff serveur Qlik ↔ base locale (soft delete + stale)">
+              Synchroniser
             </Button>
             <Button icon={Download}
               onClick={() => downloadAuthed(globalApi.exportUrl(), { filename: 'lineage-global.csv' })
@@ -97,6 +102,13 @@ export default function GlobalLayout() {
         <QlikImportModal
           onClose={() => setShowImport(false)}
           onImported={() => { load(); loadApps(); }}
+        />
+      )}
+
+      {showSync && (
+        <QlikSyncModal
+          onClose={() => setShowSync(false)}
+          onApplied={() => { load(true); loadApps(); }}
         />
       )}
     </>

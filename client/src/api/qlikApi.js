@@ -39,6 +39,12 @@ export const qlikApi = {
   appsCleanup: (staleDays) => fetch(`${BASE}/qlik/apps/cleanup${staleDays ? `?staleDays=${staleDays}` : ''}`).then(json),
   appsCleanupExportUrl: (flaggedOnly) => `${BASE}/qlik/apps/cleanup/export${flaggedOnly ? '?flaggedOnly=1' : ''}`,
   connections: ()     => fetch(`${BASE}/qlik/connections`).then(json),
+  // Synchronisation Qlik ↔ base locale (alternative au tout-supprimer/tout-réimporter)
+  syncPreview: ()     => fetch(`${BASE}/qlik/sync/preview`).then(json),
+  syncApply:   (plan) => post(`${BASE}/qlik/sync/apply`, plan),
+  syncRestore: (id)   => post(`${BASE}/qlik/sync/restore/${id}`, {}),
+  syncPurge:   (id)   => fetch(`${BASE}/qlik/sync/purge/${id}`, { method: 'DELETE' }).then(json),
+  trash:       ()     => fetch(`${BASE}/apps/trash`).then(json),
 };
 
 export const globalApi = {

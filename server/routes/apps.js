@@ -3,12 +3,28 @@ const router = express.Router();
 const db = require('../database');
 
 // GET /api/apps — avec indicateur d'analyse (pour les filtres de la sidebar)
+// Les apps soft-deleted (`deleted_at IS NOT NULL`) sont exclues par défaut ;
+// passer `?includeDeleted=1` pour voir la corbeille (page dédiée).
 router.get('/', (req, res) => {
+  const includeDeleted = req.query.includeDeleted === '1';
+  const where = includeDeleted ? '' : 'WHERE a.deleted_at IS NULL';
   const apps = db.prepare(`
     SELECT a.*, CASE WHEN an.id IS NULL THEN 0 ELSE 1 END AS analyzed
     FROM apps a
     LEFT JOIN (SELECT DISTINCT app_id, MIN(id) AS id FROM analyses GROUP BY app_id) an ON an.app_id = a.id
+    ${where}
     ORDER BY a.updated_at DESC
+  `).all();
+  res.json(apps);
+});
+
+// GET /api/apps/trash — liste des apps en corbeille uniquement
+router.get('/trash', (req, res) => {
+  const apps = db.prepare(`
+    SELECT id, name, qlik_app_id, stream, last_reload, deleted_at
+    FROM apps
+    WHERE deleted_at IS NOT NULL
+    ORDER BY deleted_at DESC
   `).all();
   res.json(apps);
 });
