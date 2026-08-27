@@ -19,10 +19,14 @@ const db = require('../database');
 
 /**
  * Calcule le diff sans rien modifier.
+ * NE COMPARE QUE LES APPS PUBLIÉES : les brouillons (non publiés) côté Qlik
+ * sont ignorés — ni proposés à l'import, ni comptés comme "à jour". Une app
+ * locale déjà importée qui a été dépubliée côté Qlik apparaît en "disparue".
  * @param {Array} serverApps  résultat de `listApps` (déjà normalisé)
  * @returns {{newApps: Array, deletedApps: Array, updatedApps: Array, unchanged: number}}
  */
-function computeDiff(serverApps) {
+function computeDiff(serverAppsRaw) {
+  const serverApps = (serverAppsRaw || []).filter(a => !!a.published);
   const byServerId = new Map(serverApps.map(a => [a.qlikAppId, a]));
   // Apps locales importées (avec qlik_app_id), qu'elles soient déjà en corbeille ou non
   const localRows = db.prepare(`

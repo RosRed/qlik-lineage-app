@@ -88,6 +88,9 @@ export default function QlikSyncModal({ onClose, onApplied }) {
           <div className="flex items-center gap-2">
             <RefreshCw size={16} className="text-emerald-400" />
             <h2 className="text-sm font-semibold text-gray-100">Synchroniser avec le serveur Qlik</h2>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-800">
+              Apps publiées uniquement
+            </span>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-gray-800 text-gray-400">
             <X size={16} />
