@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { X, RefreshCw, Loader2, Plus, Trash2, AlertTriangle, Undo2, CheckCircle2 } from 'lucide-react';
+import { X, RefreshCw, Loader2, Plus, Trash2, AlertTriangle, Undo2, CheckCircle2, Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { qlikApi } from '../api/qlikApi';
 
@@ -19,6 +19,7 @@ export default function QlikSyncModal({ onClose, onApplied }) {
   const [selectedNew, setSelectedNew] = useState(new Set());
   const [selectedDel, setSelectedDel] = useState(new Set());
   const [selectedUpd, setSelectedUpd] = useState(new Set());
+  const [selectedMeta, setSelectedMeta] = useState(new Set());
   const [applying, setApplying] = useState(false);
   const [analyzeMode, setAnalyzeMode] = useState('local');
 
@@ -32,6 +33,7 @@ export default function QlikSyncModal({ onClose, onApplied }) {
       setSelectedNew(new Set(d.newApps.map(a => a.qlikAppId)));
       setSelectedDel(new Set(d.deletedApps.map(a => a.localId)));
       setSelectedUpd(new Set(d.updatedApps.map(a => a.localId)));
+      setSelectedMeta(new Set((d.metaChangedApps || []).map(a => a.localId)));
     } catch (e) {
       setError(e.error || e.message || 'Impossible de calculer le diff');
     } finally {
@@ -41,7 +43,7 @@ export default function QlikSyncModal({ onClose, onApplied }) {
 
   useEffect(() => { load(); }, []);
 
-  const totalActions = selectedNew.size + selectedDel.size + selectedUpd.size;
+  const totalActions = selectedNew.size + selectedDel.size + selectedUpd.size + selectedMeta.size;
 
   const toggle = (set, setter, key) => {
     const next = new Set(set);
@@ -57,10 +59,14 @@ export default function QlikSyncModal({ onClose, onApplied }) {
       const reactivateLocalIds = diff.newApps
         .filter(a => a.reactivate && selectedNew.has(a.qlikAppId))
         .map(a => a.localId);
+      const metaChanges = (diff.metaChangedApps || [])
+        .filter(a => selectedMeta.has(a.localId))
+        .map(a => ({ localId: a.localId, proposed: a.proposed }));
       const applied = await qlikApi.syncApply({
         deletedLocalIds: [...selectedDel],
         updatedLocalIds: [...selectedUpd],
-        reactivateLocalIds
+        reactivateLocalIds,
+        metaChanges
       });
 
       // 2) Import des nouvelles apps sélectionnées (le flow existant s'occupe du reste)
@@ -69,7 +75,7 @@ export default function QlikSyncModal({ onClose, onApplied }) {
         await qlikApi.import(toImport, analyzeMode);
       }
       toast.success(
-        `Sync appliquée — ${toImport.length} import(s), ${applied.deleted} corbeille, ${applied.marked_stale} à ré-analyser`
+        `Sync appliquée — ${toImport.length} import(s), ${applied.deleted} corbeille, ${applied.marked_stale} à ré-analyser, ${applied.meta_refreshed || 0} méta MAJ`
       );
       onApplied?.();
       onClose();
@@ -118,11 +124,12 @@ export default function QlikSyncModal({ onClose, onApplied }) {
           <>
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
               {/* résumé */}
-              <div className="grid grid-cols-4 gap-3 text-xs">
-                <StatTile icon={Plus}  color="emerald" label="Nouvelles"    value={diff.newApps.length} />
-                <StatTile icon={AlertTriangle} color="amber" label="Modifiées" value={diff.updatedApps.length} />
-                <StatTile icon={Trash2} color="rose"    label="Supprimées"    value={diff.deletedApps.length} />
-                <StatTile icon={CheckCircle2} color="gray" label="À jour"    value={diff.unchanged} />
+              <div className="grid grid-cols-5 gap-3 text-xs">
+                <StatTile icon={Plus}          color="emerald" label="Nouvelles"    value={diff.newApps.length} />
+                <StatTile icon={Tag}           color="sky"     label="Métadonnées"  value={(diff.metaChangedApps || []).length} />
+                <StatTile icon={AlertTriangle} color="amber"   label="Modifiées"    value={diff.updatedApps.length} />
+                <StatTile icon={Trash2}        color="rose"    label="Supprimées"   value={diff.deletedApps.length} />
+                <StatTile icon={CheckCircle2}  color="gray"    label="À jour"       value={diff.unchanged} />
               </div>
 
               {/* Nouvelles */}
@@ -149,6 +156,42 @@ export default function QlikSyncModal({ onClose, onApplied }) {
                       <div className="text-[11px] text-gray-500 font-mono">{a.stream || '—'}</div>
                     </>}
                     right={a.lastReloadTime ? new Date(a.lastReloadTime).toLocaleDateString('fr-FR') : '—'}
+                  />
+                )}
+              />
+
+              {/* Métadonnées à rafraîchir */}
+              <Section
+                title="Métadonnées à mettre à jour"
+                subtitle="Stream, nom ou propriétaire ont changé côté Qlik — MAJ locale sans re-fetch du script."
+                icon={Tag} color="sky"
+                items={diff.metaChangedApps || []}
+                empty="Toutes les métadonnées sont alignées."
+                allSelected={selectedMeta.size === (diff.metaChangedApps || []).length}
+                onToggleAll={() => setSelectedMeta(
+                  selectedMeta.size === (diff.metaChangedApps || []).length
+                    ? new Set()
+                    : new Set((diff.metaChangedApps || []).map(a => a.localId))
+                )}
+                render={(a) => (
+                  <Row
+                    key={a.localId}
+                    checked={selectedMeta.has(a.localId)}
+                    onToggle={() => toggle(selectedMeta, setSelectedMeta, a.localId)}
+                    left={<>
+                      <div className="font-medium text-gray-100 text-xs">{a.name}</div>
+                      <div className="text-[11px] text-gray-500">
+                        {Object.entries(a.changes).map(([field, v]) => (
+                          <span key={field} className="inline-block mr-3">
+                            <span className="text-gray-600">{field}:</span>{' '}
+                            <span className="text-rose-400 line-through">{v.from || '—'}</span>
+                            {' → '}
+                            <span className="text-emerald-400">{v.to || '—'}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </>}
+                    right={null}
                   />
                 )}
               />
@@ -256,6 +299,7 @@ function StatTile({ icon: Icon, color, label, value }) {
     emerald: 'bg-emerald-900/30 border-emerald-800 text-emerald-300',
     amber:   'bg-amber-900/30 border-amber-800 text-amber-300',
     rose:    'bg-rose-900/30 border-rose-800 text-rose-300',
+    sky:     'bg-sky-900/30 border-sky-800 text-sky-300',
     gray:    'bg-gray-900/30 border-gray-800 text-gray-300'
   }[color];
   return (
@@ -273,7 +317,8 @@ function Section({ title, subtitle, icon: Icon, color, items, empty, render, all
   const badge = {
     emerald: 'text-emerald-400 border-emerald-900',
     amber:   'text-amber-400 border-amber-900',
-    rose:    'text-rose-400 border-rose-900'
+    rose:    'text-rose-400 border-rose-900',
+    sky:     'text-sky-400 border-sky-900'
   }[color];
   return (
     <div>

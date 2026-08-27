@@ -40,7 +40,10 @@ function computeDiff(serverAppsRaw) {
   const newApps = [];
   const deletedApps = [];
   const updatedApps = [];
+  const metaChangedApps = [];
   let unchanged = 0;
+
+  const differs = (a, b) => (a === undefined ? null : a) !== (b === undefined ? null : b);
 
   for (const s of serverApps) {
     const local = byLocalId.get(s.qlikAppId);
@@ -86,7 +89,8 @@ function computeDiff(serverAppsRaw) {
     // Comparaison last_reload : si serveur > référence locale = modifiée
     const serverReload = s.lastReloadTime || null;
     const reference = local.last_synced_reload || local.last_reload || null;
-    if (serverReload && serverReload !== reference) {
+    const reloadChanged = serverReload && serverReload !== reference;
+    if (reloadChanged) {
       updatedApps.push({
         localId: local.id,
         qlikAppId: s.qlikAppId,
@@ -95,7 +99,26 @@ function computeDiff(serverAppsRaw) {
         previousReload: reference,
         currentReload: serverReload
       });
-    } else {
+    }
+
+    // Comparaison métadonnées (stream, name, owner) — indépendant du reload
+    const metaChanges = {};
+    if (differs(local.name, s.name)) metaChanges.name = { from: local.name, to: s.name };
+    if (differs(local.stream, s.stream || null)) metaChanges.stream = { from: local.stream, to: s.stream || null };
+    if (differs(local.owner, s.owner || null)) metaChanges.owner = { from: local.owner, to: s.owner || null };
+    if (Object.keys(metaChanges).length) {
+      metaChangedApps.push({
+        localId: local.id,
+        qlikAppId: s.qlikAppId,
+        name: local.name,
+        changes: metaChanges,
+        proposed: {
+          name: s.name,
+          stream: s.stream || null,
+          owner: s.owner || null
+        }
+      });
+    } else if (!reloadChanged) {
       unchanged++;
     }
   }
@@ -113,7 +136,7 @@ function computeDiff(serverAppsRaw) {
     }
   }
 
-  return { newApps, deletedApps, updatedApps, unchanged };
+  return { newApps, deletedApps, updatedApps, metaChangedApps, unchanged };
 }
 
 /**
@@ -124,7 +147,7 @@ function computeDiff(serverAppsRaw) {
  * L'import réel des nouvelles apps est délégué au flow d'import existant ;
  * cette fonction ne fait QUE les mutations DB idempotentes (delete + stale).
  */
-function applyPlan({ deletedLocalIds = [], updatedLocalIds = [], reactivateLocalIds = [] } = {}) {
+function applyPlan({ deletedLocalIds = [], updatedLocalIds = [], reactivateLocalIds = [], metaChanges = [] } = {}) {
   const now = new Date().toISOString();
   db.exec('BEGIN');
   try {
@@ -140,6 +163,15 @@ function applyPlan({ deletedLocalIds = [], updatedLocalIds = [], reactivateLocal
       const stmt = db.prepare('UPDATE apps SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
       for (const id of reactivateLocalIds) stmt.run(id);
     }
+    if (metaChanges.length) {
+      const stmt = db.prepare(
+        'UPDATE apps SET name = ?, stream = ?, owner = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+      );
+      for (const m of metaChanges) {
+        const p = m.proposed || {};
+        stmt.run(p.name || null, p.stream || null, p.owner || null, m.localId);
+      }
+    }
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');
@@ -148,7 +180,8 @@ function applyPlan({ deletedLocalIds = [], updatedLocalIds = [], reactivateLocal
   return {
     deleted: deletedLocalIds.length,
     marked_stale: updatedLocalIds.length,
-    reactivated: reactivateLocalIds.length
+    reactivated: reactivateLocalIds.length,
+    meta_refreshed: metaChanges.length
   };
 }
 
