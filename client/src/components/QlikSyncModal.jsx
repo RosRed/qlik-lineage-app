@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { X, RefreshCw, Loader2, Plus, Trash2, AlertTriangle, Undo2, CheckCircle2, Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { qlikApi } from '../api/qlikApi';
+import QlikTrashModal from './QlikTrashModal.jsx';
 
 /**
  * Synchronise la base locale avec le serveur Qlik SANS le tout-supprimer /
@@ -22,6 +23,8 @@ export default function QlikSyncModal({ onClose, onApplied }) {
   const [selectedMeta, setSelectedMeta] = useState(new Set());
   const [applying, setApplying] = useState(false);
   const [analyzeMode, setAnalyzeMode] = useState('local');
+  const [showTrash, setShowTrash] = useState(false);
+  const [trashCount, setTrashCount] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -42,6 +45,10 @@ export default function QlikSyncModal({ onClose, onApplied }) {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    qlikApi.trash().then(r => setTrashCount(r.length)).catch(() => setTrashCount(null));
+  }, []);
 
   const totalActions = selectedNew.size + selectedDel.size + selectedUpd.size + selectedMeta.size;
 
@@ -98,9 +105,21 @@ export default function QlikSyncModal({ onClose, onApplied }) {
               Apps publiées uniquement
             </span>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-800 text-gray-400">
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            {trashCount !== null && trashCount > 0 && (
+              <button
+                onClick={() => setShowTrash(true)}
+                className="text-[11px] px-2 py-1 rounded border border-gray-700 text-gray-300 hover:bg-gray-800 inline-flex items-center gap-1.5"
+                title="Voir les apps supprimées"
+              >
+                <Trash2 size={11} className="text-rose-400" />
+                Corbeille <span className="font-mono text-rose-300">({trashCount})</span>
+              </button>
+            )}
+            <button onClick={onClose} className="p-1 rounded hover:bg-gray-800 text-gray-400">
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {loading && (
@@ -288,6 +307,13 @@ export default function QlikSyncModal({ onClose, onApplied }) {
           </>
         )}
       </div>
+
+      {showTrash && (
+        <QlikTrashModal
+          onClose={() => setShowTrash(false)}
+          onChanged={() => qlikApi.trash().then(r => setTrashCount(r.length)).catch(() => {})}
+        />
+      )}
     </div>
   );
 }
