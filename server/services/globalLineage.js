@@ -36,6 +36,11 @@ function escapeRe(s) {
  * Un wildcard sans correspondance concrète reste une entrée à part entière.
  */
 function mergeWildcards(qvds) {
+  // motif supprimé -> clés concrètes qui l'absorbent. Indispensable : les
+  // résumés d'apps référencent encore le motif, et sans ce remappage leurs
+  // clés pointeraient sur une entrée disparue — le QVD paraîtrait alors
+  // sans producteur alors qu'il en a un.
+  const remap = new Map();
   const concreteKeys = [...qvds.keys()].filter(k => !k.includes('*'));
   for (const patKey of [...qvds.keys()].filter(k => k.includes('*'))) {
     // Motif trop générique (ex: "*.qvd") → matcherait tout ; on le laisse en entrée isolée
@@ -51,6 +56,7 @@ function mergeWildcards(qvds) {
       q.consumers.push(...pat.consumers);
       pat.paths.forEach(p => q.paths.add(p));
     }
+    remap.set(patKey, matches);
     qvds.delete(patKey);
   }
   // Dédoublonnage producteurs/consommateurs (une app peut arriver deux fois après fusion)
@@ -65,6 +71,7 @@ function mergeWildcards(qvds) {
       if (seenC.has(k)) return false; seenC.add(k); return true;
     });
   }
+  return remap;
 }
 
 /** Récupère l'analyse la plus récente de chaque app ; si absente, parse le script en local */
@@ -189,7 +196,27 @@ function buildGlobalLineage() {
   }
 
   // ── Rapprochement wildcards ↔ QVD concrets ─────────────────────────────────
-  mergeWildcards(qvds);
+  const remap = mergeWildcards(qvds);
+
+  // Les résumés d'apps ont été construits avant la fusion : on réécrit leurs
+  // clés vers les entrées survivantes. Un motif peut couvrir plusieurs fichiers
+  // concrets (`ventes_*.qvd` → `ventes_2024.qvd`, `ventes_2025.qvd`) — l'app
+  // les lit tous, donc on les ajoute tous.
+  if (remap.size) {
+    const reecrire = (liste) => {
+      const out = [];
+      for (const k of liste) {
+        const cibles = remap.get(k);
+        if (cibles) out.push(...cibles);
+        else out.push(k);
+      }
+      return [...new Set(out)];
+    };
+    for (const s of appsSummary) {
+      s.producedQvds = reecrire(s.producedQvds);
+      s.consumedQvds = reecrire(s.consumedQvds);
+    }
+  }
 
   // ── Diagnostics ────────────────────────────────────────────────────────────
   const qvdList = [...qvds.values()].map(q => ({
@@ -244,4 +271,4 @@ function buildGlobalLineage() {
   };
 }
 
-module.exports = { buildGlobalLineage };
+module.exports = { buildGlobalLineage, getAllAnalyses };

@@ -107,7 +107,7 @@ export default function DashboardPage() {
                       <tr key={i}>
                         <td className="py-1.5 pr-2 font-mono text-ink">{f.package_name}</td>
                         <td className="py-1.5 pr-2 text-ink-muted">{f.project_name} · {f.folder_name}</td>
-                        <td className="py-1.5 pr-2 text-right font-bold text-red-400">{f.failures}</td>
+                        <td className="py-1.5 pr-2 text-right font-bold text-danger">{f.failures}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -8,23 +8,23 @@ import React, { useMemo } from 'react';
 function BarList({ title, subtitle, rows, unit = '', accent = '#10b981', emptyText = 'Rien à signaler' }) {
   const max = rows.length ? rows[0].value : 0;
   return (
-    <section className="bg-gray-900/40 border border-gray-800 rounded-lg p-4">
-      <h4 className="text-xs font-semibold text-gray-200">{title}</h4>
-      {subtitle && <p className="text-[10px] text-gray-600 mt-0.5 mb-3">{subtitle}</p>}
+    <section className="bg-surface border border-line rounded-lg p-4">
+      <h4 className="text-xs font-semibold text-ink">{title}</h4>
+      {subtitle && <p className="text-[10px] text-ink-faint mt-0.5 mb-3">{subtitle}</p>}
       {rows.length === 0 ? (
-        <p className="text-xs text-gray-600 mt-2">{emptyText}</p>
+        <p className="text-xs text-ink-faint mt-2">{emptyText}</p>
       ) : (
         <div className="space-y-1.5 mt-2">
           {rows.map((r, i) => (
             <div key={i} className="flex items-center gap-2">
-              <div className="w-44 shrink-0 text-[11px] text-gray-400 truncate text-right" title={r.label}>
+              <div className="w-44 shrink-0 text-[11px] text-ink-muted truncate text-right" title={r.label}>
                 {r.label}
               </div>
-              <div className="flex-1 h-4 bg-gray-800/60 rounded-sm overflow-hidden">
+              <div className="flex-1 h-4 bg-raised rounded-sm overflow-hidden">
                 <div className="h-full rounded-sm" style={{ width: `${max ? (r.value / max) * 100 : 0}%`, background: accent, opacity: 0.75 }} />
               </div>
-              <div className="w-14 shrink-0 text-[11px] font-mono text-gray-200">{r.value}{unit}</div>
-              {r.extra && <div className="w-28 shrink-0 text-[9px] text-gray-600 truncate" title={r.extra}>{r.extra}</div>}
+              <div className="w-14 shrink-0 text-[11px] font-mono text-ink">{r.value}{unit}</div>
+              {r.extra && <div className="w-28 shrink-0 text-[9px] text-ink-faint truncate" title={r.extra}>{r.extra}</div>}
             </div>
           ))}
         </div>
@@ -35,10 +35,10 @@ function BarList({ title, subtitle, rows, unit = '', accent = '#10b981', emptyTe
 
 function KeyFigure({ value, label, detail }) {
   return (
-    <div className="bg-gray-900/40 border border-gray-800 rounded-lg px-4 py-3">
-      <div className="text-2xl font-bold text-gray-100">{value}</div>
-      <div className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">{label}</div>
-      {detail && <div className="text-[10px] text-gray-600 mt-1">{detail}</div>}
+    <div className="bg-surface border border-line rounded-lg px-4 py-3">
+      <div className="text-2xl font-bold text-ink">{value}</div>
+      <div className="text-[10px] uppercase tracking-wider text-ink-muted mt-0.5">{label}</div>
+      {detail && <div className="text-[10px] text-ink-faint mt-1">{detail}</div>}
     </div>
   );
 }

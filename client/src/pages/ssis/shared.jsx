@@ -20,10 +20,10 @@ export function fmtTime(iso) {
 }
 
 const BUCKET_STYLE = {
-  success: 'bg-emerald-900/30 text-emerald-300 border-emerald-800/40',
-  failed:  'bg-red-900/30 text-red-300 border-red-800/40',
-  running: 'bg-blue-900/30 text-blue-300 border-blue-800/40',
-  other:   'bg-gray-800 text-gray-400 border-gray-700'
+  success: 'bg-accent-soft text-accent-ink border-accent',
+  failed:  'bg-danger-soft text-danger border-danger',
+  running: 'bg-info-soft text-info border-info',
+  other:   'bg-raised text-ink-muted border-line'
 };
 
 export function StatusBadge({ bucket, label }) {

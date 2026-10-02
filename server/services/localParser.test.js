@@ -319,3 +319,62 @@ LOAD Annee, Objectif FROM [lib://Fichiers/budget.xlsx] (ooxml, embedded labels, 
   const row = r.lineage.find(l => l.tableQlik === 'DIM_Budget');
   assert.strictEqual(row.sheet, 'Feuil2', 'sheet propagée dans le lineage');
 });
+
+test('v2: SQL — noms qualifiés entre guillemets et crochets', () => {
+  const r = parseQlikScript(`
+LIB CONNECT TO 'DWH (srv)';
+
+Ventes:
+LOAD Societe, Montant;
+SELECT REF_SOCIETE as Societe, MONTANT as Montant
+FROM "Groupe Premium".dbo."HISTO_VENTES";
+
+Clients:
+LOAD CodeClient;
+SELECT CODE_CLIENT as CodeClient FROM [Groupe Premium].[dbo].[CLIENTS];
+`);
+  const noms = r.sourceMeta.filter(s => s.type === 'sql').map(s => s.name);
+  assert.ok(noms.includes('HISTO_VENTES'), `guillemets: ${noms.join(', ')}`);
+  assert.ok(noms.includes('CLIENTS'), `crochets: ${noms.join(', ')}`);
+  const hv = r.sourceMeta.find(s => s.name === 'HISTO_VENTES');
+  assert.strictEqual(hv.path, 'Groupe Premium.dbo.HISTO_VENTES', 'chemin qualifié conservé');
+});
+
+test('v2: SQL — toutes les tables jointes remontent comme sources', () => {
+  const r = parseQlikScript(`
+LIB CONNECT TO 'DWH (srv)';
+
+Ventes:
+LOAD a, b;
+SELECT HV.A as a, AR.B as b
+FROM "Groupe Premium".dbo."HISTO_VENTES" HV
+LEFT JOIN [Groupe Premium].[dbo].[ARTICLES] AR ON AR.ID = HV.ID
+INNER JOIN SOCIETE S ON S.REF = HV.REF;
+`);
+  const sql = r.sourceMeta.filter(s => s.type === 'sql');
+  const noms = sql.map(s => s.name).sort();
+  assert.deepStrictEqual(noms, ['ARTICLES', 'HISTO_VENTES', 'SOCIETE'], `tables jointes: ${noms.join(', ')}`);
+  assert.strictEqual(sql.find(s => s.name === 'HISTO_VENTES').joined, false, 'table principale');
+  assert.strictEqual(sql.find(s => s.name === 'ARTICLES').joined, true, 'table jointe marquée');
+  assert.ok(sql.every(s => s.usedBy.includes('Ventes')), 'toutes rattachées à la table Qlik');
+});
+
+test('v2: SQL — les CTE et sous-requêtes ne sont pas des tables', () => {
+  const r = parseQlikScript(`
+LIB CONNECT TO 'DWH (srv)';
+
+Stades:
+LOAD Activite;
+SQL
+WITH Derniers_Stades AS (
+    SELECT ACTIVITE, MAX(DATE_STADE) AS DATE_STADE FROM STADE_DEVIS GROUP BY ACTIVITE
+)
+SELECT d.ACTIVITE as Activite
+FROM Derniers_Stades d
+INNER JOIN (SELECT * FROM AUTRE_TABLE) x ON x.ACTIVITE = d.ACTIVITE;
+`);
+  const noms = r.sourceMeta.filter(s => s.type === 'sql').map(s => s.name).sort();
+  assert.ok(!noms.includes('Derniers_Stades'), `CTE exclue: ${noms.join(', ')}`);
+  assert.ok(noms.includes('STADE_DEVIS'), 'table réelle de la CTE détectée');
+  assert.ok(noms.includes('AUTRE_TABLE'), 'table de la sous-requête détectée');
+});

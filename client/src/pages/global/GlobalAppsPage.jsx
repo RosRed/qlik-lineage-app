@@ -91,7 +91,7 @@ export default function GlobalAppsPage() {
             </thead>
             <tbody className="divide-y divide-line">
               {rows.map(a => (
-                <tr key={a.appId} className={`hover:bg-raised/60 ${!a.analyzed ? 'opacity-60' : ''}`}>
+                <tr key={a.appId} className={`hover:bg-raised ${!a.analyzed ? 'opacity-60' : ''}`}>
                   <td className="py-2 pr-3 max-w-[220px]">
                     {/* Passerelle vers la fiche de l'app — impossible avant le routeur */}
                     <Link

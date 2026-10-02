@@ -10,6 +10,8 @@ import GlobalLayout from './layouts/GlobalLayout.jsx';
 // Pages de premier niveau
 import DashboardPage from './pages/DashboardPage.jsx';
 import AppsListPage from './pages/AppsListPage.jsx';
+import AppsLayout from './layouts/AppsLayout.jsx';
+import ImpactPage from './pages/ImpactPage.jsx';
 import TasksPage from './pages/TasksPage.jsx';
 import GovernancePage from './pages/GovernancePage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
@@ -30,6 +32,7 @@ import ProblemesPage from './pages/global/ProblemesPage.jsx';
 import GraphePage from './pages/global/GraphePage.jsx';
 import DoublonsPage from './pages/global/DoublonsPage.jsx';
 import ProducteursPage from './pages/global/ProducteursPage.jsx';
+import StreamsPage from './pages/global/StreamsPage.jsx';
 
 // Pages du monitoring SSIS (imbriquées sous /ssis)
 import SsisLayout from './layouts/SsisLayout.jsx';
@@ -71,7 +74,13 @@ export default function App() {
         <Route index element={<DashboardPage />} />
 
         <Route path="apps">
-          <Route index element={<AppsListPage />} />
+          {/* Layout sans segment : la liste et l'impact partagent l'en-tête et
+              la barre d'onglets. `impact` est statique, React Router le classe
+              avant `:id` — aucune app nommée « impact » ne peut le masquer. */}
+          <Route element={<AppsLayout />}>
+            <Route index element={<AppsListPage />} />
+            <Route path="impact" element={<ImpactPage />} />
+          </Route>
           <Route path=":id" element={<AppDetailLayout />}>
             <Route index element={<OverviewPage />} />
             <Route path="sources" element={<SourcesPage />} />
@@ -90,6 +99,7 @@ export default function App() {
           <Route path="graphe" element={<GraphePage />} />
           <Route path="doublons" element={<DoublonsPage />} />
           <Route path="producteurs" element={<ProducteursPage />} />
+          <Route path="streams" element={<StreamsPage />} />
         </Route>
 
         <Route path="ssis" element={<SsisLayout />}>

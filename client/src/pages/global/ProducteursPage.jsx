@@ -279,7 +279,7 @@ export default function ProducteursPage() {
               {filtered.map((x, i) => (
                 <tr
                   key={`${x.qvd}-${x.producer.appId}`}
-                  className={`hover:bg-raised/60 ${x.isFirstOfGroup ? '' : 'border-t-0'}`}
+                  className={`hover:bg-raised ${x.isFirstOfGroup ? '' : 'border-t-0'}`}
                 >
                   <td className="py-2 pl-3 pr-2 text-right tabular-nums text-ink-faint align-top">
                     {i + 1}

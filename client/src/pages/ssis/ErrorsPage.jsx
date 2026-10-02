@@ -60,23 +60,23 @@ export default function ErrorsPage() {
           <Card key={key} className="!py-0 !px-0 mb-2 overflow-hidden">
             <button
               onClick={() => toggle(key)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-raised/50 text-left">
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-raised text-left">
               {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               <div className="flex-1 min-w-0">
-                <div className="font-mono text-sm text-red-300 truncate">{g.package}</div>
+                <div className="font-mono text-sm text-danger truncate">{g.package}</div>
                 <div className="text-[11px] text-ink-muted">{g.project} · {g.folder}</div>
               </div>
               <div className="text-right">
-                <div className="text-lg font-bold text-red-400 tabular-nums">{g.count}</div>
+                <div className="text-lg font-bold text-danger tabular-nums">{g.count}</div>
                 <div className="text-[10px] text-ink-faint">dernière {fmtTime(g.lastError)}</div>
               </div>
             </button>
             {open && (
-              <div className="border-t border-line bg-raised/30 divide-y divide-line">
+              <div className="border-t border-line bg-raised divide-y divide-line">
                 {g.items.map(m => (
                   <div key={m.id} className="px-4 py-2">
                     <div className="flex items-center gap-2 text-[10px] mb-1">
-                      <span className="uppercase font-semibold text-red-400">{m.typeLabel}</span>
+                      <span className="uppercase font-semibold text-danger">{m.typeLabel}</span>
                       <span className="text-ink-faint">{fmtTime(m.time)}</span>
                       <span className="text-ink-muted">{m.source}{m.subcomponent ? ` › ${m.subcomponent}` : ''}</span>
                     </div>

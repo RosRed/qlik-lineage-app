@@ -33,8 +33,8 @@ function CopyButton({ text }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <button onClick={handleCopy} className="p-1 text-gray-500 hover:text-gray-300 transition-colors">
-      {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+    <button onClick={handleCopy} className="p-1 text-ink-muted hover:text-ink transition-colors">
+      {copied ? <Check size={12} className="text-accent-ink" /> : <Copy size={12} />}
     </button>
   );
 }
@@ -145,7 +145,7 @@ export default function ChatTab({ app, analysis }) {
 
   if (!app) {
     return (
-      <div className="flex items-center justify-center h-full text-gray-600">
+      <div className="flex items-center justify-center h-full text-ink-faint">
         <div className="text-center">
           <MessageSquare size={40} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm">Sélectionnez une application pour utiliser le chat</p>
@@ -157,16 +157,16 @@ export default function ChatTab({ app, analysis }) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="p-3 border-b border-gray-800 flex items-center gap-3">
+      <div className="p-3 border-b border-line flex items-center gap-3">
         <div className="relative">
           <select
-            className="appearance-none bg-gray-800 text-xs text-gray-300 border border-gray-700 rounded px-3 py-1.5 pr-7 outline-none focus:border-emerald-500 cursor-pointer"
+            className="appearance-none bg-raised text-xs text-ink border border-line rounded px-3 py-1.5 pr-7 outline-none focus:border-accent cursor-pointer"
             value={mode}
             onChange={e => setMode(e.target.value)}
           >
             {MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
-          <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+          <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
         </div>
         <div className="flex-1 flex gap-2 overflow-x-auto">
           {SHORTCUTS.map((s, i) => (
@@ -174,13 +174,13 @@ export default function ChatTab({ app, analysis }) {
               key={i}
               onClick={() => sendMessage(s.msg)}
               disabled={streaming}
-              className="shrink-0 text-xs px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 hover:text-gray-200 rounded transition-colors disabled:opacity-50"
+              className="shrink-0 text-xs px-2.5 py-1.5 bg-raised hover:bg-raised border border-line text-ink-muted hover:text-ink rounded transition-colors disabled:opacity-50"
             >
               {s.label}
             </button>
           ))}
         </div>
-        <button onClick={clearChat} className="text-gray-600 hover:text-red-400 transition-colors p-1">
+        <button onClick={clearChat} className="text-ink-faint hover:text-danger transition-colors p-1">
           <Trash2 size={14} />
         </button>
       </div>
@@ -188,17 +188,17 @@ export default function ChatTab({ app, analysis }) {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && !streaming && (
-          <div className="text-center text-gray-600 py-12 text-sm">
+          <div className="text-center text-ink-faint py-12 text-sm">
             <MessageSquare size={32} className="mx-auto mb-3 opacity-20" />
-            Posez une question sur <span className="text-emerald-500">{app.name}</span>
+            Posez une question sur <span className="text-accent-ink">{app.name}</span>
           </div>
         )}
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] rounded-lg px-4 py-3 ${
               msg.role === 'user'
-                ? 'bg-emerald-900/40 border border-emerald-700/50 text-white'
-                : 'bg-gray-800/80 border border-gray-700/50 text-gray-200'
+                ? 'bg-accent-soft border border-accent text-ink'
+                : 'bg-raised border border-line text-ink'
             }`}>
               {msg.role === 'assistant' ? (
                 <>
@@ -206,11 +206,11 @@ export default function ChatTab({ app, analysis }) {
                   {/* Badge source */}
                   <div className="mt-2 flex justify-end">
                     {msg.source === 'local' ? (
-                      <span className="flex items-center gap-1 text-[10px] text-yellow-600 opacity-70">
+                      <span className="flex items-center gap-1 text-[10px] text-warn opacity-70">
                         <Zap size={9} /> Local
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-[10px] text-violet-600 opacity-70">
+                      <span className="flex items-center gap-1 text-[10px] text-violet opacity-70">
                         <Brain size={9} /> Claude
                       </span>
                     )}
@@ -224,18 +224,18 @@ export default function ChatTab({ app, analysis }) {
         ))}
         {streaming && streamText && (
           <div className="flex justify-start">
-            <div className="max-w-[85%] bg-gray-800/80 border border-gray-700/50 text-gray-200 rounded-lg px-4 py-3">
+            <div className="max-w-[85%] bg-raised border border-line text-ink rounded-lg px-4 py-3">
               <MessageContent content={streamText} />
-              <span className="inline-block w-1.5 h-4 bg-emerald-500 animate-pulse ml-0.5 align-middle" />
+              <span className="inline-block w-1.5 h-4 bg-accent animate-pulse ml-0.5 align-middle" />
             </div>
           </div>
         )}
         {streaming && !streamText && (
           <div className="flex justify-start">
-            <div className="bg-gray-800/80 border border-gray-700/50 rounded-lg px-4 py-3">
+            <div className="bg-raised border border-line rounded-lg px-4 py-3">
               <div className="flex gap-1">
                 {[0, 1, 2].map(i => (
-                  <div key={i} className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                  <div key={i} className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
                 ))}
               </div>
             </div>
@@ -245,10 +245,10 @@ export default function ChatTab({ app, analysis }) {
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t border-gray-800">
+      <div className="p-3 border-t border-line">
         <div className="flex gap-2">
           <textarea
-            className="flex-1 bg-gray-800 text-sm text-white placeholder-gray-600 border border-gray-700 focus:border-emerald-500 rounded-lg px-3 py-2.5 resize-none outline-none leading-relaxed"
+            className="flex-1 bg-raised text-sm text-ink placeholder-ink-faint border border-line focus:border-accent rounded-lg px-3 py-2.5 resize-none outline-none leading-relaxed"
             placeholder={`Posez une question sur ${app.name}...`}
             rows={2}
             value={input}
@@ -264,12 +264,12 @@ export default function ChatTab({ app, analysis }) {
           <button
             onClick={() => sendMessage(input)}
             disabled={streaming || !input.trim()}
-            className="px-3 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+            className="px-3 py-2.5 bg-accent hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
           >
             <Send size={16} />
           </button>
         </div>
-        <p className="text-xs text-gray-700 mt-1.5">Entrée pour envoyer · Shift+Entrée pour nouvelle ligne</p>
+        <p className="text-xs text-ink-faint mt-1.5">Entrée pour envoyer · Shift+Entrée pour nouvelle ligne</p>
       </div>
     </div>
   );

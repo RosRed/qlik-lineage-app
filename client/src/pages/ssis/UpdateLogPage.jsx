@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Loader2, RefreshCw, FileWarning, AlertTriangle, TrendingUp, TrendingDown,
-  Minus, Zap, Table, ListTree, FileText, ChevronDown, ChevronRight, HeartPulse
+  Minus, Zap, Table, ListTree, FileText, ChevronDown, ChevronRight, HeartPulse,
+  CalendarDays
 } from 'lucide-react';
 import { ssisApi } from '../../api/qlikApi';
 import { PageBody, Card, Select, SearchInput, Button, ErrorNote, EmptyState } from '../../components/ui/primitives';
@@ -14,14 +15,85 @@ import { useSsisContext } from '../../layouts/SsisLayout.jsx';
  *               score d'anomalie (chute, écart statistique, plantage…)
  *   - Runs    : regroupement par proximité temporelle (≤ 10 min) → "batch"
  *   - Brut    : le log détaillé (le rendu générique précédent)
+ *
+ * La référence de comparaison ("Préc.") est par défaut l'exécution qui précède
+ * immédiatement la dernière. `baseline` (AAAA-MM-JJ) permet de la fixer sur une
+ * date précise : on prend alors le dernier chargement enregistré avant la fin de
+ * cette journée-là, pour chaque couple (table, société).
  */
 
+// ─── Date de comparaison ─────────────────────────────────────────────────────
+
+/** Date locale au format AAAA-MM-JJ (pas toISOString : celui-ci décale en UTC). */
+function toISODate(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function daysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return toISODate(d);
+}
+
+/** AAAA-MM-JJ → JJ/MM (affichage compact dans les en-têtes de colonne). */
+function fmtDay(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y.slice(2)}`;
+}
+
+const chipCls = (active) =>
+  `text-[11px] px-2 py-1 rounded border transition-colors ${
+    active
+      ? 'bg-accent-soft text-accent-ink border-accent'
+      : 'border-line text-ink-muted hover:text-ink hover:bg-raised'
+  }`;
+
+/**
+ * Choix de la référence de comparaison : raccourcis (exécution précédente,
+ * hier, semaine dernière) + calendrier libre. Valeur '' = mode automatique.
+ */
+function BaselinePicker({ value, onChange }) {
+  const today = toISODate(new Date());
+  const yesterday = daysAgo(1);
+  const lastWeek = daysAgo(7);
+
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <span className="text-[10px] uppercase tracking-wider text-ink-faint flex items-center gap-1">
+        <CalendarDays size={12} /> Comparer à
+      </span>
+      <button onClick={() => onChange('')} className={chipCls(!value)}
+        title="Comparer à l'exécution qui précède immédiatement la dernière">
+        Exécution préc.
+      </button>
+      <button onClick={() => onChange(yesterday)} className={chipCls(value === yesterday)}
+        title={`Dernier chargement au ${fmtDay(yesterday)}`}>
+        Hier
+      </button>
+      <button onClick={() => onChange(lastWeek)} className={chipCls(value === lastWeek)}
+        title={`Dernier chargement au ${fmtDay(lastWeek)}`}>
+        Semaine dernière
+      </button>
+      <input
+        type="date"
+        max={today}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        title="Comparer au dernier chargement enregistré à cette date"
+        className="bg-canvas border border-line rounded-lg px-2 py-1 text-xs text-ink outline-none focus:border-accent transition-colors"
+      />
+    </div>
+  );
+}
+
 const ANOMALY_LABELS = {
-  collapsed: { label: 'Effondrement', color: 'bg-red-900/50 text-red-200 border-red-700', tip: 'Précédent > 0 → dernier = 0' },
-  big_drop:  { label: 'Chute > 50%', color: 'bg-red-900/30 text-red-300 border-red-800/40', tip: 'delta ≤ -50%' },
-  big_jump:  { label: 'Hausse > 200%', color: 'bg-yellow-900/30 text-yellow-300 border-yellow-800/40', tip: 'delta ≥ +200%' },
-  z_score:   { label: 'Aberration stat.', color: 'bg-orange-900/30 text-orange-300 border-orange-800/40', tip: '|z| > 2 sur 3+ runs' },
-  stalled:   { label: 'Bloqué', color: 'bg-gray-800 text-gray-400 border-gray-700', tip: 'COUNT strictement identique' }
+  collapsed: { label: 'Effondrement', color: 'bg-danger-soft text-danger border-danger', tip: 'Précédent > 0 → dernier = 0' },
+  big_drop:  { label: 'Chute > 50%', color: 'bg-danger-soft text-danger border-danger', tip: 'delta ≤ -50%' },
+  big_jump:  { label: 'Hausse > 200%', color: 'bg-warn-soft text-warn border-warn', tip: 'delta ≥ +200%' },
+  z_score:   { label: 'Aberration stat.', color: 'bg-warn-soft text-warn border-warn', tip: '|z| > 2 sur 3+ runs' },
+  stalled:   { label: 'Bloqué', color: 'bg-raised text-ink-muted border-line', tip: 'COUNT strictement identique' }
 };
 
 function fmtRows(n) {
@@ -32,8 +104,8 @@ function fmtRows(n) {
 function fmtDelta(d) {
   if (d == null) return { text: '—', cls: 'text-ink-faint', Icon: Minus };
   if (d === 0) return { text: '0', cls: 'text-ink-faint', Icon: Minus };
-  if (d > 0) return { text: `+${d.toLocaleString('fr-FR')}`, cls: 'text-emerald-400', Icon: TrendingUp };
-  return { text: d.toLocaleString('fr-FR'), cls: 'text-red-400', Icon: TrendingDown };
+  if (d > 0) return { text: `+${d.toLocaleString('fr-FR')}`, cls: 'text-accent-ink', Icon: TrendingUp };
+  return { text: d.toLocaleString('fr-FR'), cls: 'text-danger', Icon: TrendingDown };
 }
 
 function fmtPct(p) {
@@ -46,7 +118,7 @@ function AnomalyBadges({ list }) {
   return (
     <div className="flex flex-wrap gap-1">
       {list.map(a => {
-        const meta = ANOMALY_LABELS[a] || { label: a, color: 'bg-gray-800 text-gray-400' };
+        const meta = ANOMALY_LABELS[a] || { label: a, color: 'bg-raised text-ink-muted' };
         return (
           <span key={a} title={meta.tip}
             className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${meta.color}`}>
@@ -60,7 +132,7 @@ function AnomalyBadges({ list }) {
 
 // ─── Vue Résumé ──────────────────────────────────────────────────────────────
 
-function SummaryView({ database, days, refSoc }) {
+function SummaryView({ database, days, refSoc, baseline }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -75,11 +147,11 @@ function SummaryView({ database, days, refSoc }) {
   useEffect(() => {
     if (!database) return;
     setLoading(true); setError(null);
-    ssisApi.updateLogSummary({ database, days, ref_societe: refSoc })
+    ssisApi.updateLogSummary({ database, days, ref_societe: refSoc, baseline })
       .then(setData)
       .catch(e => setError(e.error || e.message))
       .finally(() => setLoading(false));
-  }, [database, days, refSoc]);
+  }, [database, days, refSoc, baseline]);
 
   const stats = useMemo(() => {
     if (!data) return null;
@@ -153,10 +225,10 @@ function SummaryView({ database, days, refSoc }) {
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
           <Card className="!p-2"><div className="text-[10px] uppercase text-ink-faint">Total</div><div className="text-lg font-bold">{stats.total}</div></Card>
-          <Card className="!p-2 border-red-800/40"><div className="text-[10px] uppercase text-red-400">Critiques</div><div className="text-lg font-bold text-red-300">{stats.critical}</div></Card>
-          <Card className="!p-2 border-yellow-800/40"><div className="text-[10px] uppercase text-yellow-400">Warnings</div><div className="text-lg font-bold text-yellow-300">{stats.warning}</div></Card>
-          <Card className="!p-2 border-orange-800/40"><div className="text-[10px] uppercase text-orange-400">Info</div><div className="text-lg font-bold text-orange-300">{stats.info}</div></Card>
-          <Card className="!p-2 border-emerald-800/40"><div className="text-[10px] uppercase text-emerald-400">OK</div><div className="text-lg font-bold text-emerald-300">{stats.ok}</div></Card>
+          <Card className="!p-2 border-danger"><div className="text-[10px] uppercase text-danger">Critiques</div><div className="text-lg font-bold text-danger">{stats.critical}</div></Card>
+          <Card className="!p-2 border-warn"><div className="text-[10px] uppercase text-warn">Warnings</div><div className="text-lg font-bold text-warn">{stats.warning}</div></Card>
+          <Card className="!p-2 border-warn"><div className="text-[10px] uppercase text-warn">Info</div><div className="text-lg font-bold text-warn">{stats.info}</div></Card>
+          <Card className="!p-2 border-accent"><div className="text-[10px] uppercase text-accent-ink">OK</div><div className="text-lg font-bold text-accent-ink">{stats.ok}</div></Card>
         </div>
       )}
 
@@ -209,6 +281,14 @@ function SummaryView({ database, days, refSoc }) {
         <span className="ml-auto text-[11px] text-ink-faint">{filtered.length} / {data.length}</span>
       </div>
 
+      {baseline && (
+        <div className="mb-3 text-[11px] text-ink-muted flex items-center gap-1.5">
+          <CalendarDays size={12} className="text-accent-ink" />
+          Comparaison avec le dernier chargement enregistré au <strong className="text-ink">{fmtDay(baseline)}</strong>.
+          Les tables sans chargement antérieur à cette date apparaissent sans précédent.
+        </div>
+      )}
+
       {filtered.length === 0 ? (
         <EmptyState icon={FileWarning} title="Rien à afficher" description="Aucun rechargement ne correspond." />
       ) : (
@@ -220,8 +300,8 @@ function SummaryView({ database, days, refSoc }) {
                   <th className="py-2 px-3">Table</th>
                   <th className="py-2 px-3">Société</th>
                   <th className="py-2 px-3 text-right">Dernier</th>
-                  <th className="py-2 px-3 text-right">Préc.</th>
-                  <th className="py-2 px-3 text-right">Δ vs préc.</th>
+                  <th className="py-2 px-3 text-right">{baseline ? `Au ${fmtDay(baseline)}` : 'Préc.'}</th>
+                  <th className="py-2 px-3 text-right">{baseline ? `Δ vs ${fmtDay(baseline)}` : 'Δ vs préc.'}</th>
                   <th className="py-2 px-3 text-right">Δ vs moy.</th>
                   <th className="py-2 px-3 text-right">Runs</th>
                   <th className="py-2 px-3">Anomalies</th>
@@ -233,15 +313,18 @@ function SummaryView({ database, days, refSoc }) {
                   const d = fmtDelta(r.delta);
                   const da = fmtDelta(r.deltaVsAvg);
                   const rowCls =
-                    r.severity === 'critical' ? 'bg-red-950/30' :
-                    r.severity === 'warning'  ? 'bg-yellow-950/20' :
-                    r.severity === 'info'     ? 'bg-orange-950/10' : '';
+                    r.severity === 'critical' ? 'bg-danger-soft' :
+                    r.severity === 'warning'  ? 'bg-warn-soft' :
+                    r.severity === 'info'     ? 'bg-warn-soft' : '';
                   return (
-                    <tr key={i} className={`hover:bg-raised/60 ${rowCls}`}>
+                    <tr key={i} className={`hover:bg-raised ${rowCls}`}>
                       <td className="py-2 px-3 font-mono text-info">{r.table}</td>
                       <td className="py-2 px-3 text-ink text-[11px]">{r.societeName || r.refSociete}</td>
                       <td className="py-2 px-3 text-right font-mono tabular-nums text-ink">{fmtRows(r.lastCount)}</td>
-                      <td className="py-2 px-3 text-right font-mono tabular-nums text-ink-muted">{fmtRows(r.prevCount)}</td>
+                      <td className="py-2 px-3 text-right font-mono tabular-nums text-ink-muted"
+                        title={r.prevAt ? `Chargement du ${fmtTime(r.prevAt)}` : 'Aucun chargement antérieur'}>
+                        {fmtRows(r.prevCount)}
+                      </td>
                       <td className={`py-2 px-3 text-right font-mono tabular-nums ${d.cls}`}>
                         <span className="inline-flex items-center gap-1 justify-end">
                           <d.Icon size={11} /> {d.text}<span className="text-[10px] text-ink-faint">{fmtPct(r.deltaPct)}</span>
@@ -320,7 +403,7 @@ function RunsView({ database, days, refSoc }) {
             return (
               <Card key={run.runId} className="!py-0 !px-0 overflow-hidden">
                 <button onClick={() => toggle(run.runId)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-raised/50 text-left">
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-raised text-left">
                   {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -337,10 +420,10 @@ function RunsView({ database, days, refSoc }) {
                   </div>
                 </button>
                 {open && items.length > 0 && (
-                  <div className="border-t border-line bg-raised/30 px-4 py-3">
+                  <div className="border-t border-line bg-raised px-4 py-3">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-[11px] font-mono">
                       {items.map((t, i) => (
-                        <div key={i} className="flex justify-between border-b border-line/30 py-0.5">
+                        <div key={i} className="flex justify-between border-b border-line py-0.5">
                           <span className="text-info truncate">{t.name}</span>
                           <span className="text-ink tabular-nums">{fmtRows(t.count)}</span>
                         </div>
@@ -364,7 +447,7 @@ function RunsView({ database, days, refSoc }) {
 
 // ─── Vue Santé société ──────────────────────────────────────────────────────
 
-function HealthView({ database, days, refSoc }) {
+function HealthView({ database, days, refSoc, baseline }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -374,11 +457,11 @@ function HealthView({ database, days, refSoc }) {
   useEffect(() => {
     if (!database) return;
     setLoading(true); setError(null);
-    ssisApi.updateLogSummary({ database, days, ref_societe: refSoc })
+    ssisApi.updateLogSummary({ database, days, ref_societe: refSoc, baseline })
       .then(setData)
       .catch(e => setError(e.error || e.message))
       .finally(() => setLoading(false));
-  }, [database, days, refSoc]);
+  }, [database, days, refSoc, baseline]);
 
   // Agrégation par société : compte total, anomalies, score de santé.
   const societes = useMemo(() => {
@@ -426,16 +509,16 @@ function HealthView({ database, days, refSoc }) {
   };
 
   const scoreColor = (score) => {
-    if (score >= 90) return 'text-emerald-400';
-    if (score >= 70) return 'text-yellow-400';
-    if (score >= 50) return 'text-orange-400';
-    return 'text-red-400';
+    if (score >= 90) return 'text-accent-ink';
+    if (score >= 70) return 'text-warn';
+    if (score >= 50) return 'text-warn';
+    return 'text-danger';
   };
   const scoreBarColor = (score) => {
-    if (score >= 90) return 'bg-emerald-500';
-    if (score >= 70) return 'bg-yellow-500';
-    if (score >= 50) return 'bg-orange-500';
-    return 'bg-red-500';
+    if (score >= 90) return 'bg-accent';
+    if (score >= 70) return 'bg-warn';
+    if (score >= 50) return 'bg-warn';
+    return 'bg-danger';
   };
 
   if (error) return <ErrorNote>{error}</ErrorNote>;
@@ -463,7 +546,7 @@ function HealthView({ database, days, refSoc }) {
             return (
               <Card key={soc.refSociete} className="!py-0 !px-0 overflow-hidden">
                 <button onClick={() => toggle(soc.refSociete)}
-                  className="w-full flex items-center gap-4 px-4 py-3 hover:bg-raised/50 text-left">
+                  className="w-full flex items-center gap-4 px-4 py-3 hover:bg-raised text-left">
                   {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -472,9 +555,9 @@ function HealthView({ database, days, refSoc }) {
                     </div>
                     <div className="text-[11px] text-ink-muted mt-0.5">
                       {soc.total} tables · {fmtRows(soc.totalRows)} rows
-                      {soc.critical > 0 && <span className="text-red-400"> · {soc.critical} critiques</span>}
-                      {soc.warning > 0 && <span className="text-yellow-400"> · {soc.warning} warnings</span>}
-                      {soc.info > 0    && <span className="text-orange-400"> · {soc.info} info</span>}
+                      {soc.critical > 0 && <span className="text-danger"> · {soc.critical} critiques</span>}
+                      {soc.warning > 0 && <span className="text-warn"> · {soc.warning} warnings</span>}
+                      {soc.info > 0    && <span className="text-warn"> · {soc.info} info</span>}
                     </div>
                   </div>
                   {/* Barre de santé */}
@@ -492,9 +575,9 @@ function HealthView({ database, days, refSoc }) {
                   </div>
                 </button>
                 {open && (
-                  <div className="border-t border-line bg-raised/30 px-4 py-3">
+                  <div className="border-t border-line bg-raised px-4 py-3">
                     {soc.worstTables.length === 0 ? (
-                      <p className="text-xs text-emerald-400">Aucune anomalie 🎉</p>
+                      <p className="text-xs text-accent-ink">Aucune anomalie 🎉</p>
                     ) : (
                       <>
                         <div className="text-[10px] uppercase tracking-wider text-ink-muted mb-2">
@@ -504,9 +587,9 @@ function HealthView({ database, days, refSoc }) {
                           {soc.worstTables.map((t, i) => (
                             <div key={i} className="flex items-center gap-2 text-xs">
                               <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
-                                t.severity === 'critical' ? 'bg-red-900/40 text-red-300' :
-                                t.severity === 'warning'  ? 'bg-yellow-900/40 text-yellow-300' :
-                                                            'bg-orange-900/40 text-orange-300'}`}>
+                                t.severity === 'critical' ? 'bg-danger-soft text-danger' :
+                                t.severity === 'warning'  ? 'bg-warn-soft text-warn' :
+                                                            'bg-warn-soft text-warn'}`}>
                                 {t.severity}
                               </span>
                               <span className="font-mono text-info flex-1">{t.table}</span>
@@ -590,7 +673,7 @@ function RawView({ database, days, refSoc }) {
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-wider text-ink-muted border-b border-line bg-raised">
                   {columns.map(c => (
-                    <th key={c} className={`py-2 px-3 ${c === '__societe_name' ? 'text-emerald-400' : ''}`}>
+                    <th key={c} className={`py-2 px-3 ${c === '__societe_name' ? 'text-accent-ink' : ''}`}>
                       {c === '__societe_name' ? 'Société (join)' : c}
                     </th>
                   ))}
@@ -598,10 +681,10 @@ function RawView({ database, days, refSoc }) {
               </thead>
               <tbody className="divide-y divide-line">
                 {filtered.map((r, i) => (
-                  <tr key={i} className="hover:bg-raised/60">
+                  <tr key={i} className="hover:bg-raised">
                     {columns.map(c => (
                       <td key={c} className={`py-2 px-3 font-mono ${
-                        c === '__societe_name' ? 'text-emerald-300' :
+                        c === '__societe_name' ? 'text-accent-ink' :
                         typeof r[c] === 'number' ? 'text-right tabular-nums text-ink' : 'text-ink-muted'
                       }`}>{fmtCell(r[c])}</td>
                     ))}
@@ -625,6 +708,8 @@ export default function UpdateLogPage() {
   const [societes, setSocietes] = useState([]);
   const [refSoc, setRefSoc] = useState('');
   const [days, setDays] = useState(7);
+  // '' = comparaison automatique (exécution précédente) ; sinon AAAA-MM-JJ.
+  const [baseline, setBaseline] = useState('');
   const [tab, setTab] = useState('summary');
 
   useEffect(() => {
@@ -666,6 +751,11 @@ export default function UpdateLogPage() {
             {societes.map(s => <option key={s.ref} value={s.ref}>{String(s.name || s.ref).trim()}</option>)}
           </Select>
         )}
+        {/* Seules les vues Résumé et Santé exploitent le "précédent" — inutile
+            d'afficher le sélecteur sur Runs et Log brut. */}
+        {(tab === 'summary' || tab === 'health') && (
+          <BaselinePicker value={baseline} onChange={setBaseline} />
+        )}
       </div>
 
       <div className="flex items-center gap-2 mb-4">
@@ -675,8 +765,8 @@ export default function UpdateLogPage() {
         {tabBtn('raw',     'Log brut',            FileText)}
       </div>
 
-      {tab === 'summary' && <SummaryView database={database} days={days} refSoc={refSoc} />}
-      {tab === 'health'  && <HealthView  database={database} days={days} refSoc={refSoc} />}
+      {tab === 'summary' && <SummaryView database={database} days={days} refSoc={refSoc} baseline={baseline} />}
+      {tab === 'health'  && <HealthView  database={database} days={days} refSoc={refSoc} baseline={baseline} />}
       {tab === 'runs'    && <RunsView    database={database} days={days} refSoc={refSoc} />}
       {tab === 'raw'     && <RawView     database={database} days={days} refSoc={refSoc} />}
     </PageBody>

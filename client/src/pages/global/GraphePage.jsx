@@ -65,15 +65,15 @@ export default function GraphePage() {
 
       <div className="flex flex-wrap gap-4 text-xs text-ink-muted mb-3">
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-violet/30 border border-violet" />
+          <span className="w-3 h-3 rounded-sm bg-violet border border-violet" />
           App batch (génère des QVD)
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-warn/30 border border-warn" />
+          <span className="w-3 h-3 rounded-sm bg-warn border border-warn" />
           App transform (lit + écrit)
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-accent/30 border border-accent" />
+          <span className="w-3 h-3 rounded-sm bg-accent border border-accent" />
           App front (consomme)
         </span>
         <span className="flex items-center gap-1.5">

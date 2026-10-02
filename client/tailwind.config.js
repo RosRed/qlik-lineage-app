@@ -25,7 +25,9 @@ export default {
         warn: 'var(--c-warn)',
         'warn-soft': 'var(--c-warn-soft)',
         info: 'var(--c-info)',
-        violet: 'var(--c-violet)'
+        'info-soft': 'var(--c-info-soft)',
+        violet: 'var(--c-violet)',
+        'violet-soft': 'var(--c-violet-soft)'
       },
       boxShadow: {
         card: '0 1px 2px var(--c-shadow)',

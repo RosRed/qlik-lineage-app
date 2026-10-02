@@ -80,21 +80,21 @@ export default function QlikTrashModal({ onClose, onChanged }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-3xl max-h-[90vh] rounded-lg border border-gray-700 bg-gray-950 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800">
+      <div className="w-full max-w-3xl max-h-[90vh] rounded-lg border border-line bg-canvas flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-line">
           <div className="flex items-center gap-2">
-            <Trash2 size={16} className="text-rose-400" />
-            <h2 className="text-sm font-semibold text-gray-100">Corbeille des apps</h2>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-300 font-mono">
+            <Trash2 size={16} className="text-danger" />
+            <h2 className="text-sm font-semibold text-ink">Corbeille des apps</h2>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-raised text-ink font-mono">
               {items.length}
             </span>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-800 text-gray-400">
+          <button onClick={onClose} className="p-1 rounded hover:bg-raised text-ink-muted">
             <X size={16} />
           </button>
         </div>
 
-        <div className="px-5 py-2 border-b border-gray-800 bg-amber-950/20 text-[11px] text-amber-300 flex items-start gap-2">
+        <div className="px-5 py-2 border-b border-line bg-warn-soft text-[11px] text-warn flex items-start gap-2">
           <AlertTriangle size={12} className="mt-0.5 shrink-0" />
           <span>
             Ces apps ont été retirées de Qlik (dépubliées ou supprimées). Elles restent lisibles ici
@@ -105,20 +105,20 @@ export default function QlikTrashModal({ onClose, onChanged }) {
 
         <div className="flex-1 overflow-y-auto p-5">
           {loading ? (
-            <div className="flex items-center justify-center py-10 text-gray-400 text-xs">
+            <div className="flex items-center justify-center py-10 text-ink-muted text-xs">
               <Loader2 className="animate-spin mr-2" size={14} /> Chargement…
             </div>
           ) : items.length === 0 ? (
-            <div className="text-center py-10 text-xs text-gray-500 italic">
+            <div className="text-center py-10 text-xs text-ink-muted italic">
               Corbeille vide.
             </div>
           ) : (
-            <div className="border border-gray-800 rounded divide-y divide-gray-800 overflow-hidden">
+            <div className="border border-line rounded divide-y divide-line overflow-hidden">
               {items.map(item => (
-                <div key={item.id} className="flex items-center justify-between px-3 py-2 hover:bg-gray-900/60">
+                <div key={item.id} className="flex items-center justify-between px-3 py-2 hover:bg-raised">
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-gray-100 truncate">{item.name}</div>
-                    <div className="text-[11px] text-gray-500 flex items-center gap-3 mt-0.5">
+                    <div className="text-xs font-medium text-ink truncate">{item.name}</div>
+                    <div className="text-[11px] text-ink-muted flex items-center gap-3 mt-0.5">
                       <span>Stream: <span className="font-mono">{item.stream || '—'}</span></span>
                       {item.last_reload && (
                         <span>Dernier reload: {new Date(item.last_reload).toLocaleDateString('fr-FR')}</span>
@@ -130,14 +130,14 @@ export default function QlikTrashModal({ onClose, onChanged }) {
                     <button
                       disabled={busyId === item.id}
                       onClick={() => restore(item.id)}
-                      className="text-[11px] px-2 py-1 rounded border border-emerald-800 text-emerald-300 hover:bg-emerald-900/30 disabled:opacity-50 inline-flex items-center gap-1"
+                      className="text-[11px] px-2 py-1 rounded border border-accent text-accent-ink hover:bg-accent-soft disabled:opacity-50 inline-flex items-center gap-1"
                     >
                       <Undo2 size={11} /> Restaurer
                     </button>
                     <button
                       disabled={busyId === item.id}
                       onClick={() => purge(item.id)}
-                      className="text-[11px] px-2 py-1 rounded border border-rose-800 text-rose-300 hover:bg-rose-900/30 disabled:opacity-50 inline-flex items-center gap-1"
+                      className="text-[11px] px-2 py-1 rounded border border-danger text-danger hover:bg-danger-soft disabled:opacity-50 inline-flex items-center gap-1"
                     >
                       <Trash2 size={11} /> Purger
                     </button>
@@ -149,23 +149,23 @@ export default function QlikTrashModal({ onClose, onChanged }) {
         </div>
 
         {items.length > 0 && (
-          <div className="border-t border-gray-800 px-5 py-3 flex items-center justify-between bg-gray-900/40">
-            <div className="text-xs text-gray-400">
+          <div className="border-t border-line px-5 py-3 flex items-center justify-between bg-surface">
+            <div className="text-xs text-ink-muted">
               {items.length} app(s) en corbeille
             </div>
             {confirmPurgeAll ? (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-rose-300">Confirmer la purge de toutes les {items.length} ?</span>
+                <span className="text-xs text-danger">Confirmer la purge de toutes les {items.length} ?</span>
                 <button
                   onClick={() => setConfirmPurgeAll(false)}
-                  className="text-xs px-2 py-1 rounded border border-gray-700 text-gray-300 hover:bg-gray-800"
+                  className="text-xs px-2 py-1 rounded border border-line text-ink hover:bg-raised"
                 >
                   Annuler
                 </button>
                 <button
                   disabled={purgingAll}
                   onClick={purgeAll}
-                  className="text-xs px-3 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white inline-flex items-center gap-1 disabled:opacity-50"
+                  className="text-xs px-3 py-1 rounded bg-danger hover:bg-danger text-white inline-flex items-center gap-1 disabled:opacity-50"
                 >
                   {purgingAll ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
                   Oui, purger tout
@@ -174,7 +174,7 @@ export default function QlikTrashModal({ onClose, onChanged }) {
             ) : (
               <button
                 onClick={() => setConfirmPurgeAll(true)}
-                className="text-xs px-3 py-1.5 rounded border border-rose-800 text-rose-300 hover:bg-rose-900/30 inline-flex items-center gap-1.5"
+                className="text-xs px-3 py-1.5 rounded border border-danger text-danger hover:bg-danger-soft inline-flex items-center gap-1.5"
               >
                 <Trash2 size={12} /> Vider la corbeille
               </button>

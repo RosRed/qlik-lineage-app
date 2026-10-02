@@ -1,16 +1,10 @@
 import { cachedGet, invalidate as cacheInvalidate } from '../lib/apiCache';
+import { parseJson } from './parseJson';
 
 const BASE = '/api';
 
-const json = async (res) => {
-  // Certains endpoints peuvent renvoyer un 5xx sans corps JSON (proxy timeout,
-  // socket coupée) — on lit le texte pour ne pas planter sur Unexpected end of JSON input.
-  const text = await res.text();
-  let body = null;
-  if (text) { try { body = JSON.parse(text); } catch (_) { body = { error: text.slice(0, 500) }; } }
-  if (!res.ok) return Promise.reject(body || { error: `HTTP ${res.status}` });
-  return body;
-};
+// Meme lecture tolerante que partout ailleurs (voir parseJson.js).
+const json = parseJson;
 
 const post = (url, body) =>
   fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(json);
@@ -52,7 +46,15 @@ export const globalApi = {
     ? fetch(`${BASE}/global/lineage`).then(json).then(r => { cacheInvalidate(`${BASE}/global/lineage`); return r; })
     : cachedGet(`${BASE}/global/lineage`, CFG_HEAVY),
   duplicates:  () => cachedGet(`${BASE}/global/duplicates`, CFG_HEAVY),
+  // Recherche d'impact — cachee 5 min par (requete, types) : rejouer la meme
+  // recherche en naviguant ne relance pas le calcul du lineage global.
+  impact: (q, kinds) => cachedGet(
+    `${BASE}/global/impact?q=${encodeURIComponent(q)}&kinds=${encodeURIComponent(kinds.join(','))}`,
+    CFG_HEAVY
+  ),
   producers:   () => cachedGet(`${BASE}/global/producers`, CFG_HEAVY),
+  // Dependance aux QVD par stream (calcul lourd : cache 5 min comme le lineage)
+  streams:     () => cachedGet(`${BASE}/global/streams`, CFG_HEAVY),
   exportUrl:            () => `${BASE}/global/export`,
   exportFamiliesUrl:    () => `${BASE}/global/duplicates/export/families`,
   exportTwinsUrl:       () => `${BASE}/global/duplicates/export/twins`,

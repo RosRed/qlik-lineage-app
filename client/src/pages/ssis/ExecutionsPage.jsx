@@ -69,10 +69,10 @@ function ExecutionDetail({ id, onClose }) {
                   {data.messages.map(m => (
                     <div key={m.id} className={`text-[11px] rounded border px-2.5 py-1.5 ${
                       m.typeLabel === 'error' || m.typeLabel === 'task_failed'
-                        ? 'border-red-800/40 bg-red-900/10'
-                        : 'border-yellow-800/40 bg-yellow-900/10'}`}>
+                        ? 'border-danger bg-danger-soft'
+                        : 'border-warn bg-warn-soft'}`}>
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className={`font-semibold ${m.typeLabel === 'error' || m.typeLabel === 'task_failed' ? 'text-red-300' : 'text-yellow-300'}`}>
+                        <span className={`font-semibold ${m.typeLabel === 'error' || m.typeLabel === 'task_failed' ? 'text-danger' : 'text-warn'}`}>
                           {m.typeLabel}
                         </span>
                         <span className="text-ink-faint">{fmtTime(m.time)}</span>
@@ -201,7 +201,7 @@ export default function ExecutionsPage() {
               <tbody className="divide-y divide-line">
                 {data.rows.map(r => (
                   <tr key={r.execution_id} onClick={() => setSelected(r.execution_id)}
-                      className="hover:bg-raised/60 cursor-pointer">
+                      className="hover:bg-raised cursor-pointer">
                     <td className="py-2 px-3"><StatusBadge bucket={r.bucket} label={r.statusLabel} /></td>
                     <td className="py-2 px-3 font-mono text-info">{r.package}</td>
                     <td className="py-2 px-3 text-ink-muted">{r.project} · {r.folder}</td>
@@ -217,7 +217,7 @@ export default function ExecutionsPage() {
             </table>
           </div>
           {data.total > limit && (
-            <div className="flex items-center justify-between px-3 py-2 border-t border-line bg-raised/40">
+            <div className="flex items-center justify-between px-3 py-2 border-t border-line bg-raised">
               <Button onClick={() => setOffset(Math.max(0, offset - limit))} disabled={offset === 0}>
                 <ChevronLeft size={13} /> Précédent
               </Button>

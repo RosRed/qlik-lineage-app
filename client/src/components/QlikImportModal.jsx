@@ -2,8 +2,8 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { X, Server, Plug, Download, CheckCircle2, XCircle, Loader2, RefreshCw } from 'lucide-react';
 import { qlikApi } from '../api/qlikApi';
 
-const inputCls = 'w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-xs text-gray-100 focus:outline-none focus:border-emerald-500 font-mono';
-const labelCls = 'block text-[11px] font-medium text-gray-400 mb-1';
+const inputCls = 'w-full bg-surface border border-line rounded px-3 py-2 text-xs text-ink focus:outline-none focus:border-accent font-mono';
+const labelCls = 'block text-[11px] font-medium text-ink-muted mb-1';
 
 export default function QlikImportModal({ onClose, onImported }) {
   const [step, setStep] = useState('config');            // config | apps
@@ -144,16 +144,16 @@ export default function QlikImportModal({ onClose, onImported }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6" onClick={onClose}>
       <div
-        className="bg-gray-950 border border-gray-800 rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl"
+        className="bg-canvas border border-line rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-line">
           <div className="flex items-center gap-2">
-            <Server size={15} className="text-emerald-400" />
-            <h2 className="text-sm font-semibold text-white">Serveur Qlik Sense — import des apps</h2>
+            <Server size={15} className="text-accent-ink" />
+            <h2 className="text-sm font-semibold text-ink">Serveur Qlik Sense — import des apps</h2>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-200"><X size={16} /></button>
+          <button onClick={onClose} className="text-ink-muted hover:text-ink"><X size={16} /></button>
         </div>
 
         {/* Body */}
@@ -169,10 +169,10 @@ export default function QlikImportModal({ onClose, onImported }) {
                   <button key={mode} onClick={() => setConfig({ ...config, auth_mode: mode })}
                     className={`flex-1 text-left px-3 py-2 rounded border text-xs ${
                       config.auth_mode === mode
-                        ? 'border-emerald-500 bg-emerald-900/20 text-emerald-300'
-                        : 'border-gray-800 bg-gray-900/40 text-gray-400 hover:border-gray-700'}`}>
+                        ? 'border-accent bg-accent-soft text-accent-ink'
+                        : 'border-line bg-surface text-ink-muted hover:border-line'}`}>
                     <div className="font-semibold">{label}</div>
-                    <div className="text-[10px] text-gray-500 mt-0.5">{hint}</div>
+                    <div className="text-[10px] text-ink-muted mt-0.5">{hint}</div>
                   </button>
                 ))}
               </div>
@@ -203,7 +203,7 @@ export default function QlikImportModal({ onClose, onImported }) {
                         value={config.proxy_password}
                         onChange={e => setConfig({ ...config, proxy_password: e.target.value })} />
                     </div>
-                    <p className="col-span-3 text-[10px] text-gray-600">
+                    <p className="col-span-3 text-[10px] text-ink-faint">
                       Le compte se connecte via le formulaire du virtual proxy (comme sur le hub).
                       Le mot de passe est stocké uniquement dans la base locale de cette app.
                     </p>
@@ -240,9 +240,9 @@ export default function QlikImportModal({ onClose, onImported }) {
                       <input className={inputCls} placeholder="sa_repository" value={config.user_id}
                         onChange={e => setConfig({ ...config, user_id: e.target.value })} />
                     </div>
-                    <p className="col-span-3 text-[10px] text-gray-600">
-                      Certificats exportés depuis QMC → Certificats : <code className="text-emerald-400">client.pfx</code> (format Windows)
-                      ou <code className="text-emerald-400">client.pem</code> + <code className="text-emerald-400">client_key.pem</code> (format PEM).
+                    <p className="col-span-3 text-[10px] text-ink-faint">
+                      Certificats exportés depuis QMC → Certificats : <code className="text-accent-ink">client.pfx</code> (format Windows)
+                      ou <code className="text-accent-ink">client.pem</code> + <code className="text-accent-ink">client_key.pem</code> (format PEM).
                     </p>
                   </>
                 )}
@@ -250,11 +250,11 @@ export default function QlikImportModal({ onClose, onImported }) {
 
               {testState && testState !== 'testing' && (
                 testState.ok ? (
-                  <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-900/20 border border-emerald-800/40 rounded px-3 py-2">
+                  <div className="flex items-center gap-2 text-xs text-accent-ink bg-accent-soft border border-accent rounded px-3 py-2">
                     <CheckCircle2 size={14} /> Connecté — Qlik Sense build {testState.version}
                   </div>
                 ) : (
-                  <div className="flex items-start gap-2 text-xs text-red-400 bg-red-900/20 border border-red-800/40 rounded px-3 py-2">
+                  <div className="flex items-start gap-2 text-xs text-danger bg-danger-soft border border-danger rounded px-3 py-2">
                     <XCircle size={14} className="mt-0.5 shrink-0" /> {testState.error}
                   </div>
                 )
@@ -262,12 +262,12 @@ export default function QlikImportModal({ onClose, onImported }) {
 
               <div className="flex gap-2">
                 <button onClick={testConnection} disabled={!configReady || testState === 'testing'}
-                  className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-gray-200 rounded">
+                  className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-raised hover:bg-raised disabled:opacity-40 text-ink rounded">
                   {testState === 'testing' ? <Loader2 size={13} className="animate-spin" /> : <Plug size={13} />}
                   Tester la connexion
                 </button>
                 <button onClick={loadServerApps} disabled={!configReady || loadingApps}
-                  className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded">
+                  className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-accent hover:bg-accent disabled:opacity-40 text-white rounded">
                   {loadingApps ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
                   Lister les apps du serveur
                 </button>
@@ -279,48 +279,48 @@ export default function QlikImportModal({ onClose, onImported }) {
             <div className="space-y-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <select value={publishedFilter} onChange={e => setPublishedFilter(e.target.value)}
-                  className="bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200">
+                  className="bg-surface border border-line rounded px-2 py-1.5 text-xs text-ink">
                   <option value="oui">✅ Publiées uniquement</option>
                   <option value="non">Privées uniquement</option>
                   <option value="">Toutes</option>
                 </select>
                 <select value={streamFilter} onChange={e => setStreamFilter(e.target.value)}
-                  className="bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200">
+                  className="bg-surface border border-line rounded px-2 py-1.5 text-xs text-ink">
                   <option value="">Tous les streams</option>
                   {streams.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
                 <input value={nameFilter} onChange={e => setNameFilter(e.target.value)} placeholder="Filtrer par nom..."
-                  className="bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-200 w-36 focus:outline-none focus:border-emerald-600" />
-                <button onClick={toggleAll} className="text-xs text-emerald-400 hover:text-emerald-300">
+                  className="bg-surface border border-line rounded px-2 py-1.5 text-xs text-ink w-36 focus:outline-none focus:border-accent" />
+                <button onClick={toggleAll} className="text-xs text-accent-ink hover:text-accent-ink">
                   Tout (dé)sélectionner
                 </button>
-                <span className="text-[10px] text-gray-600">{filteredApps.length}/{serverApps.length} apps</span>
+                <span className="text-[10px] text-ink-faint">{filteredApps.length}/{serverApps.length} apps</span>
                 <div className="flex-1" />
-                <button onClick={() => setStep('config')} className="text-xs text-gray-500 hover:text-gray-300">← Connexion</button>
+                <button onClick={() => setStep('config')} className="text-xs text-ink-muted hover:text-ink">← Connexion</button>
               </div>
 
-              <div className="border border-gray-800 rounded max-h-72 overflow-y-auto divide-y divide-gray-800/60">
+              <div className="border border-line rounded max-h-72 overflow-y-auto divide-y divide-line">
                 {filteredApps.map(a => (
-                  <label key={a.qlikAppId} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-900/60 cursor-pointer">
+                  <label key={a.qlikAppId} className="flex items-center gap-3 px-3 py-2 hover:bg-raised cursor-pointer">
                     <input type="checkbox" checked={selected.has(a.qlikAppId)} onChange={() => toggle(a.qlikAppId)}
                       className="accent-emerald-500" />
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs text-gray-200 truncate">{a.name}</div>
-                      <div className="text-[10px] text-gray-500">
+                      <div className="text-xs text-ink truncate">{a.name}</div>
+                      <div className="text-[10px] text-ink-muted">
                         {a.stream || '(non publiée)'}
                         {a.lastReloadTime && ` · reload ${new Date(a.lastReloadTime).toLocaleDateString()}`}
                       </div>
                     </div>
-                    {a.imported && <span className="text-[10px] px-1.5 py-0.5 bg-emerald-900/40 text-emerald-400 rounded">importée</span>}
+                    {a.imported && <span className="text-[10px] px-1.5 py-0.5 bg-accent-soft text-accent-ink rounded">importée</span>}
                   </label>
                 ))}
-                {filteredApps.length === 0 && <div className="p-4 text-xs text-gray-600 text-center">Aucune app</div>}
+                {filteredApps.length === 0 && <div className="p-4 text-xs text-ink-faint text-center">Aucune app</div>}
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="text-[11px] text-gray-500">Analyse après import :</span>
+                <span className="text-[11px] text-ink-muted">Analyse après import :</span>
                 <select value={analyzeMode} onChange={e => setAnalyzeMode(e.target.value)}
-                  className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200">
+                  className="bg-surface border border-line rounded px-2 py-1 text-xs text-ink">
                   <option value="local">⚡ Locale (rapide, gratuite)</option>
                   <option value="claude">🤖 Claude (sémantique, API)</option>
                 </select>
@@ -328,28 +328,28 @@ export default function QlikImportModal({ onClose, onImported }) {
 
               {/* Progression de l'import */}
               {importing && progress && (
-                <div className="bg-gray-900 border border-gray-800 rounded px-3 py-3 space-y-2">
+                <div className="bg-surface border border-line rounded px-3 py-3 space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-300">
+                    <span className="text-ink">
                       {progress.done}/{progress.total} apps
-                      {progress.imported > 0 && <span className="text-emerald-400"> · {progress.imported} ok</span>}
-                      {progress.failed > 0 && <span className="text-red-400"> · {progress.failed} échec(s)</span>}
+                      {progress.imported > 0 && <span className="text-accent-ink"> · {progress.imported} ok</span>}
+                      {progress.failed > 0 && <span className="text-danger"> · {progress.failed} échec(s)</span>}
                     </span>
-                    <span className="text-gray-500 text-[10px]">
+                    <span className="text-ink-muted text-[10px]">
                       {progress.elapsedMs > 3000 && progress.done > 0 && progress.done < progress.total && (
                         <>~{Math.ceil(((progress.elapsedMs / progress.done) * (progress.total - progress.done)) / 1000)}s restantes</>
                       )}
                     </span>
                   </div>
-                  <div className="h-2 bg-gray-800 rounded overflow-hidden">
-                    <div className="h-full bg-emerald-500 transition-all duration-500"
+                  <div className="h-2 bg-raised rounded overflow-hidden">
+                    <div className="h-full bg-accent transition-all duration-500"
                       style={{ width: `${progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%` }} />
                   </div>
                   {progress.currentApp && (
-                    <div className="text-[10px] text-gray-500 flex items-center gap-1.5">
+                    <div className="text-[10px] text-ink-muted flex items-center gap-1.5">
                       <Loader2 size={10} className="animate-spin" />
-                      En cours : <span className="text-gray-300">{progress.currentApp}</span>
-                      <span className="text-gray-600">(script + analyse)</span>
+                      En cours : <span className="text-ink">{progress.currentApp}</span>
+                      <span className="text-ink-faint">(script + analyse)</span>
                     </div>
                   )}
                 </div>
@@ -357,19 +357,19 @@ export default function QlikImportModal({ onClose, onImported }) {
 
               {importResult && (
                 importResult.error ? (
-                  <div className="text-xs text-red-400 bg-red-900/20 border border-red-800/40 rounded px-3 py-2">{importResult.error}</div>
+                  <div className="text-xs text-danger bg-danger-soft border border-danger rounded px-3 py-2">{importResult.error}</div>
                 ) : (
-                  <div className="text-xs bg-gray-900 border border-gray-800 rounded px-3 py-2 space-y-1">
-                    <div className="text-emerald-400">✅ {importResult.imported} importée(s){importResult.failed > 0 && <span className="text-red-400"> · {importResult.failed} échec(s)</span>}</div>
+                  <div className="text-xs bg-surface border border-line rounded px-3 py-2 space-y-1">
+                    <div className="text-accent-ink">✅ {importResult.imported} importée(s){importResult.failed > 0 && <span className="text-danger"> · {importResult.failed} échec(s)</span>}</div>
                     {importResult.results.filter(r => !r.ok).map(r => (
-                      <div key={r.qlikAppId} className="text-red-400/80">• {r.name} : {r.error}</div>
+                      <div key={r.qlikAppId} className="text-danger">• {r.name} : {r.error}</div>
                     ))}
                   </div>
                 )
               )}
 
               <button onClick={runImport} disabled={selected.size === 0 || importing}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded">
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-semibold bg-accent hover:bg-accent disabled:opacity-40 text-white rounded">
                 {importing ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                 {importing ? 'Import en cours (script + analyse)...' : `Importer ${selected.size} app(s)`}
               </button>

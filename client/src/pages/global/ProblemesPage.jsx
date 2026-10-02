@@ -12,8 +12,8 @@ import { AppChips } from '../../components/global/bits.jsx';
 
 function Section({ tone, icon: Icon, title, hint, items, renderItem, emptyLabel }) {
   const toneClasses = {
-    danger: 'text-danger border-danger/30 bg-danger-soft',
-    warn: 'text-warn border-warn/30 bg-warn-soft',
+    danger: 'text-danger border-danger bg-danger-soft',
+    warn: 'text-warn border-warn bg-warn-soft',
     muted: 'text-ink-muted border-line bg-raised'
   }[tone];
 

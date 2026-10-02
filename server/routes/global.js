@@ -10,8 +10,41 @@ const router = express.Router();
 const { buildGlobalLineage } = require('../services/globalLineage');
 const { analyzeDuplicates } = require('../services/duplicateService');
 const { analyzeQvdProducers } = require('../services/qvdProducersService');
+const { searchImpact } = require('../services/impactSearch');
+const { buildStreamQvdUsage } = require('../services/streamQvdService');
+const db = require('../database');
 
 // GET /api/global/lineage
+// GET /api/global/streams
+// Dependance aux QVD par stream : qui en consomme, qui n'en consomme aucun.
+// Sert le chantier de reduction du nombre d'apps dependantes de QVD.
+router.get('/streams', async (req, res) => {
+  try {
+    // La config Qlik sert a ne compter que les producteurs qui tournent
+    // vraiment (tache de reload active).
+    const config = db.prepare('SELECT * FROM qlik_config WHERE id = 1').get();
+    res.json(await buildStreamQvdUsage(config));
+  } catch (e) {
+    console.error('[Streams QVD]', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/global/impact?q=HISTO_VENTES&kinds=sql,fichier
+// « Cette table ne charge plus — quelles apps sont touchées ? »
+// Impact direct (apps qui lisent la source) + indirect (apps qui lisent les QVD
+// produits par les précédentes, en cascade).
+router.get('/impact', (req, res) => {
+  try {
+    const kinds = String(req.query.kinds || 'sql,fichier')
+      .split(',').map(k => k.trim()).filter(Boolean);
+    res.json(searchImpact(req.query.q || '', { kinds }));
+  } catch (e) {
+    console.error('[Impact]', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.get('/lineage', (req, res) => {
   try {
     res.json(buildGlobalLineage());

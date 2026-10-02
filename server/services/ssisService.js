@@ -711,10 +711,24 @@ async function readUpdateLog(cfg, { database, days = 7, ref_societe = null, sear
  *   - "big_jump"  : hausse > 200% vs précédent
  *   - "z_score"   : |last - avg| / std > 2 (aberration statistique)
  *   - "stalled"   : COUNT identique aux N dernières exécutions
+ *
+ * `baseline` (optionnel, 'YYYY-MM-DD') change la référence de comparaison :
+ *   - absent  → le "précédent" est l'exécution qui précède immédiatement la
+ *               dernière (comportement historique)
+ *   - présent → le "précédent" est le dernier chargement enregistré AVANT la
+ *               fin de cette journée, pour chaque couple (table, société).
+ *               La recherche n'est pas bornée par `days` : une table rechargée
+ *               hier peut ainsi être comparée à son état d'il y a six mois.
+ *               La dernière exécution elle-même est toujours exclue de la
+ *               référence (b.TIMESTAMP < r1.captured_at), sinon choisir la date
+ *               du jour comparerait la ligne à elle-même.
  */
-async function getUpdateLogSummary(cfg, { database, days = 30, ref_societe = null } = {}) {
+async function getUpdateLogSummary(cfg, { database, days = 30, ref_societe = null, baseline = null } = {}) {
   if (!/^[A-Za-z0-9_\-\. ]+$/.test(database)) {
     throw Object.assign(new Error('Nom de base invalide'), { status: 400 });
+  }
+  if (baseline && !/^\d{4}-\d{2}-\d{2}$/.test(baseline)) {
+    throw Object.assign(new Error('Date de comparaison invalide (format attendu : AAAA-MM-JJ)'), { status: 400 });
   }
   const q = `
     USE [${database}];
@@ -736,7 +750,17 @@ async function getUpdateLogSummary(cfg, { database, days = 30, ref_societe = nul
            r1.avg_count, r1.std_count, r1.max_count, r1.min_count, r1.run_count,
            s.LIBELLE_SOCIETE AS societe_name
     FROM ranked r1
-    LEFT JOIN ranked r2 ON r2.TABLE_NAME = r1.TABLE_NAME AND r2.REF_SOCIETE = r1.REF_SOCIETE AND r2.rn = 2
+    ${baseline
+      ? `OUTER APPLY (
+          SELECT TOP 1 b.[COUNT] AS row_count, b.[TIMESTAMP] AS captured_at
+          FROM TABLE_UPDATE_LOG b
+          WHERE b.TABLE_NAME = r1.TABLE_NAME
+            AND b.REF_SOCIETE = r1.REF_SOCIETE
+            AND b.[TIMESTAMP] < DATEADD(DAY, 1, CAST(@baseline AS DATE))
+            AND b.[TIMESTAMP] < r1.captured_at
+          ORDER BY b.[TIMESTAMP] DESC
+        ) r2`
+      : 'LEFT JOIN ranked r2 ON r2.TABLE_NAME = r1.TABLE_NAME AND r2.REF_SOCIETE = r1.REF_SOCIETE AND r2.rn = 2'}
     LEFT JOIN SOCIETE s ON s.REF_SOCIETE = r1.REF_SOCIETE
     WHERE r1.rn = 1
     ORDER BY r1.TABLE_NAME, s.LIBELLE_SOCIETE;
@@ -744,6 +768,7 @@ async function getUpdateLogSummary(cfg, { database, days = 30, ref_societe = nul
   const pool = await ssisClient.getPool(cfg);
   const req = pool.request().input('days', days);
   if (ref_societe) req.input('refSoc', ref_societe);
+  if (baseline) req.input('baseline', baseline);
   const res = await req.query(q);
 
   return res.recordset.map(r => {

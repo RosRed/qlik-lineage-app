@@ -315,6 +315,71 @@ function methodFromPath(path, formatSpec) {
 }
 
 /**
+ * Découpe un nom qualifié en ses parties, en respectant crochets et guillemets.
+ * `"Groupe Premium".dbo."HISTO_VENTES"` → ['Groupe Premium', 'dbo', 'HISTO_VENTES']
+ * `[Groupe Premium].[dbo].[ARTICLES]`   → ['Groupe Premium', 'dbo', 'ARTICLES']
+ */
+function splitQualified(raw) {
+  const parts = [];
+  let cur = '', inBracket = false, inQuote = false;
+  for (const ch of raw) {
+    if (inBracket) { cur += ch; if (ch === ']') inBracket = false; continue; }
+    if (inQuote) { cur += ch; if (ch === '"') inQuote = false; continue; }
+    if (ch === '[') { inBracket = true; cur += ch; continue; }
+    if (ch === '"') { inQuote = true; cur += ch; continue; }
+    if (ch === '.') { parts.push(cur); cur = ''; continue; }
+    if (/\s/.test(ch)) continue;               // espaces autour des points
+    cur += ch;
+  }
+  if (cur) parts.push(cur);
+  return parts.map(cleanName).filter(Boolean);
+}
+
+// Un identifiant SQL : [entre crochets] | "entre guillemets" | mot nu.
+const SQL_IDENT = '(?:\\[[^\\]]+\\]|"[^"]+"|[A-Za-z_]\\w*)';
+const SQL_QUALIFIED = `${SQL_IDENT}(?:\\s*\\.\\s*${SQL_IDENT})*`;
+const SQL_TABLE_RE = new RegExp(`\\b(?:FROM|JOIN)\\s+(${SQL_QUALIFIED})`, 'gi');
+const SQL_CTE_RE = /(?:\bWITH\b|,)\s*([A-Za-z_]\w*)\s+AS\s*\(/gi;
+
+/**
+ * Toutes les tables physiques référencées par une requête SQL : le FROM ET tous
+ * les JOIN, noms qualifiés compris. Sont exclus :
+ *   - les CTE (`WITH x AS (…)`) — ce sont des vues temporaires, pas des tables
+ *   - les sous-requêtes `FROM (SELECT …)` — la regex exige un identifiant, donc
+ *     elles ne matchent pas ; les tables qu'elles contiennent sont trouvées par
+ *     les occurrences FROM/JOIN suivantes
+ * Retourne [{ name, qualified }] dédupliqué, dans l'ordre d'apparition.
+ */
+function extractSqlTables(sql, cteScope) {
+  if (!sql) return [];
+
+  // Les CTE se déclarent AVANT le SELECT principal (`WITH x AS (…) SELECT …`).
+  // `sql` commence au SELECT de tête : il faut donc chercher les `WITH` dans
+  // l'instruction entière, sinon la CTE est prise pour une vraie table.
+  const ctes = new Set();
+  SQL_CTE_RE.lastIndex = 0;
+  let c;
+  while ((c = SQL_CTE_RE.exec(cteScope || sql))) ctes.add(c[1].toLowerCase());
+
+  const out = [];
+  const seen = new Set();
+  SQL_TABLE_RE.lastIndex = 0;
+  let m;
+  while ((m = SQL_TABLE_RE.exec(sql))) {
+    const parts = splitQualified(m[1].trim());
+    if (!parts.length) continue;
+    const name = parts[parts.length - 1];
+    if (!name || ctes.has(name.toLowerCase())) continue;
+    const qualified = parts.join('.');
+    const key = qualified.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ name, qualified });
+  }
+  return out;
+}
+
+/**
  * Parse une instruction contenant LOAD (et/ou SELECT).
  * Retourne { fields, source: {loadMethod, sourcePath, sourceName, residentTable, sqlQuery}, pending }
  * pending = true si LOAD "précédent" sans source (attend un SQL SELECT).
@@ -327,16 +392,21 @@ function parseLoadStatement(text) {
   // Instruction SQL pure (SELECT sans LOAD) — souvent appariée à un LOAD précédent
   if (loadIdx === -1 && selectIdx !== -1) {
     const rawSql = text.slice(selectIdx).replace(/\s+/g, ' ').trim();
-    const fromM = rawSql.match(/\bFROM\b\s+((?:\[[^\]]+\]|[\w."])+)/i);
-    const srcTable = fromM ? cleanName(fromM[1]) : null;
+    // Tables cherchées dans l'instruction ENTIÈRE, pas seulement à partir du
+    // SELECT de tête : le corps d'une CTE le précède et lit de vraies tables,
+    // qui sont bien des sources de l'application.
+    const fullSql = text.replace(/\s+/g, ' ').trim();
+    const sqlTables = extractSqlTables(fullSql, fullSql);
+    const main = sqlTables[0] || null;
     const sqlFields = parseFieldList(rawSql.replace(/^SELECT\s+(DISTINCT\s+)?/i, '').split(/\bFROM\b/i)[0])
       .map(parseField).filter(f => f.alias);
     return {
       isSqlOnly: true,
       fields: sqlFields,
       source: {
-        loadMethod: 'sql', sourcePath: fromM ? fromM[1] : null,
-        sourceName: srcTable || 'SQL', residentTable: null, sqlQuery: rawSql
+        loadMethod: 'sql', sourcePath: main ? main.qualified : null,
+        sourceName: main ? main.name : 'SQL', residentTable: null, sqlQuery: rawSql,
+        sqlTables
       }
     };
   }
@@ -355,6 +425,26 @@ function parseLoadStatement(text) {
 
   const source = { loadMethod: 'unknown', sourcePath: null, sourceName: '—', residentTable: null, sqlQuery: null, sheet: null };
   let pending = false;
+
+  // `LOAD … SQL SELECT … FROM table` dans UNE seule instruction : le FROM
+  // appartient au SQL, pas à Qlik. Sans ce test, la table SQL serait traitée
+  // comme un chemin de fichier et perdue par le regroupement par connexion.
+  if (sourceKind === 'FROM' && selectIdx !== -1 && selectIdx > loadIdx && selectIdx < sourceIdx) {
+    const rawSql = text.slice(selectIdx).replace(/\s+/g, ' ').trim();
+    const sqlTables = extractSqlTables(rawSql, text);
+    const main = sqlTables[0] || null;
+    source.loadMethod = 'sql';
+    source.sourcePath = main ? main.qualified : null;
+    source.sourceName = main ? main.name : 'SQL';
+    source.sqlQuery = rawSql;
+    source.sqlTables = sqlTables;
+    // Les alias viennent du SELECT, pas de la partie LOAD
+    const selFields = parseFieldList(
+      rawSql.replace(/^SELECT\s+(DISTINCT\s+)?/i, '').split(/\bFROM\b/i)[0]
+    ).map(parseField).filter(f => f.alias);
+    if (selFields.length) fields = selFields;
+    return { isSqlOnly: false, fields, source, pending: false };
+  }
 
   if (sourceKind === 'FROM') {
     const after = text.slice(sourceIdx + 4);
@@ -462,12 +552,16 @@ function parseQlikScript(scriptContent, appName = 'Application') {
 
   const ensureSourceMeta = (name, meta) => {
     if (!name || name === '—') return null;
-    // Deux feuilles du même Excel = deux sources distinctes
-    const key = meta.sheet ? `${name}#${meta.sheet}` : name;
+    // Deux feuilles du même Excel = deux sources distinctes.
+    // Pour le SQL, la clé est le nom QUALIFIÉ : deux schémas peuvent porter une
+    // table du même nom court sans que l'une écrase l'autre.
+    const key = meta.sheet ? `${name}#${meta.sheet}`
+      : meta.loadMethod === 'sql' && meta.sourcePath ? `sql:${meta.sourcePath.toLowerCase()}`
+      : name;
     if (!sourceMetaMap.has(key)) {
       sourceMetaMap.set(key, {
         name, path: meta.sourcePath || null, type: meta.loadMethod,
-        sheet: meta.sheet || null,
+        sheet: meta.sheet || null, joined: !!meta.joined,
         connection: meta.connection || null, usedBy: [], fieldCount: 0
       });
     }
@@ -504,6 +598,18 @@ function parseQlikScript(scriptContent, appName = 'Application') {
     if (sm) {
       if (!sm.usedBy.includes(tableName)) sm.usedBy.push(tableName);
       sm.fieldCount += fields.length;
+    }
+
+    // Une requête SQL lit rarement une seule table : chaque table jointe est
+    // une source à part entière. Elle n'apporte pas de champ propre au modèle
+    // Qlik (les alias appartiennent au SELECT), d'où fieldCount à 0 et le
+    // marqueur `joined` qui permet de la distinguer dans l'UI.
+    for (const t of (meta.sqlTables || []).slice(1)) {
+      const jm = ensureSourceMeta(t.name, {
+        ...meta, sourceName: t.name, sourcePath: t.qualified, joined: true
+      });
+      if (jm && !jm.usedBy.includes(tableName)) jm.usedBy.push(tableName);
+      addSource(t.name);
     }
     if (meta.loadMethod === 'qvd' || meta.loadMethod === 'excel' || meta.loadMethod === 'csv' || meta.loadMethod === 'file') {
       addSource(srcName);
@@ -576,13 +682,18 @@ function parseQlikScript(scriptContent, appName = 'Application') {
       continue;
     }
 
-    // Connexions
+    // Connexions.
+    // `for each Var in '0'` ne se termine PAS par ';' : la connexion se retrouve
+    // donc dans la même instruction que l'en-tête de boucle. On cherche le
+    // CONNECT en début de LIGNE et non en début d'instruction, sinon tous les
+    // batchs bâtis sur une boucle par société perdent leur connexion.
     let m;
-    if ((m = trimmed.match(/^LIB\s+CONNECT\s+TO\s+['"]([^'"]+)['"]/i)) ||
-        (m = trimmed.match(/^(?:ODBC|OLEDB)?\s*CONNECT(?:32|64)?\s+TO\s+['"]([^'"]+)['"]/i))) {
+    if ((m = trimmed.match(/^[ 	]*LIB\s+CONNECT\s+TO\s+['"]([^'"]+)['"]/im)) ||
+        (m = trimmed.match(/^[ 	]*(?:ODBC|OLEDB)?\s*CONNECT(?:32|64)?\s+TO\s+['"]([^'"]+)['"]/im))) {
       currentConnection = m[1];
       addSource(m[1]);
-      continue;
+      // On ne saute l'instruction que si elle ne porte rien d'autre à parser.
+      if (!findKw(trimmed, buildMask(trimmed), 'LOAD') && !findKw(trimmed, buildMask(trimmed), 'SELECT')) continue;
     }
     if (/^DISCONNECT\b/i.test(trimmed)) { currentConnection = null; continue; }
 
@@ -649,7 +760,8 @@ function parseQlikScript(scriptContent, appName = 'Application') {
       if (pendingLoad) {
         // Le LOAD précédent définit les alias ; le SELECT définit la source
         const fields = pendingLoad.fields.length ? pendingLoad.fields : parsed.fields;
-        applyLoad(pendingLoad.tableName, fields, { ...meta, isMapping: pendingLoad.isMapping });
+        applyLoad(pendingLoad.tableName, fields, { ...meta, isMapping: pendingLoad.isMapping },
+          { fromJoin: !!pendingLoad.fromJoin });
         lastTable = pendingLoad.tableName;
         coverage.parsedBlocks += 2; // le couple LOAD+SELECT compte pour ses 2 instructions
         pendingLoad = null;
@@ -671,13 +783,21 @@ function parseQlikScript(scriptContent, appName = 'Application') {
     let viaJoin = false;
     if (!target && prefixes.join) { target = prefixes.joinTarget || lastTable; viaJoin = true; }
     if (!target && prefixes.concat) { target = prefixes.concatTarget || lastTable; }
-    if (!target && parsed.pending) {
-      // LOAD précédent : la table sera nommée par le label déjà lu (aucun) → mémoriser
-      pendingLoad = { tableName: `(sans nom L${stmt.line})`, fields: parsed.fields, isMapping: prefixes.isMapping };
-      continue;
-    }
-    if (label && parsed.pending) {
-      pendingLoad = { tableName: label, fields: parsed.fields, isMapping: prefixes.isMapping };
+    if (parsed.pending) {
+      // LOAD sans source : elle arrivera avec le SQL SELECT suivant. La cible
+      // est mémorisée telle qu'elle sera résolue — label, cible de
+      // JOIN/CONCATENATE, ou table sans nom. Sans ce traitement, un
+      // `LEFT JOIN LOAD …; SQL SELECT …;` était consommé comme un chargement
+      // sans source, et la table SQL du SELECT suivant était perdue.
+      const cible = label
+        || (prefixes.join ? (prefixes.joinTarget || lastTable) : null)
+        || (prefixes.concat ? (prefixes.concatTarget || lastTable) : null);
+      pendingLoad = {
+        tableName: cible || `(sans nom L${stmt.line})`,
+        fields: parsed.fields,
+        isMapping: prefixes.isMapping,
+        fromJoin: !label && !!prefixes.join
+      };
       continue;
     }
     if (!target) {

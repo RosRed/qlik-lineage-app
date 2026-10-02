@@ -18,7 +18,7 @@ export default function SsisPlaceholderPage({ title, description, phase }) {
     <PageBody>
       <Card className="max-w-xl mx-auto text-center py-10">
         <div className="flex justify-center mb-3">
-          <Construction size={36} className="text-yellow-500" />
+          <Construction size={36} className="text-warn" />
         </div>
         <h3 className="text-sm font-semibold text-ink">{title}</h3>
         <p className="text-xs text-ink-muted mt-2 max-w-md mx-auto">{description}</p>
@@ -29,7 +29,7 @@ export default function SsisPlaceholderPage({ title, description, phase }) {
         )}
         {!configured && (
           <div className="mt-5 pt-4 border-t border-line">
-            <p className="text-xs text-yellow-400 mb-2">Configurez d'abord la connexion à SSISDB.</p>
+            <p className="text-xs text-warn mb-2">Configurez d'abord la connexion à SSISDB.</p>
             <NavLink to="/ssis/settings"
               className="inline-flex items-center gap-1 text-xs text-accent-ink hover:underline">
               Aller aux réglages <ExternalLink size={11} />

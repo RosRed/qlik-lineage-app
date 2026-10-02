@@ -64,7 +64,7 @@ export function StatCard({ icon: Icon, label, value, tone = 'default', hint }) {
   const isAlert = (tone === 'danger' || tone === 'warn') && Number(value) > 0;
   const valueTone = isAlert || tone === 'accent' ? STAT_TONES[tone] : STAT_TONES.default;
   const borderTone = isAlert
-    ? tone === 'danger' ? 'border-danger/40' : 'border-warn/40'
+    ? tone === 'danger' ? 'border-danger' : 'border-warn'
     : 'border-line';
 
   return (
@@ -81,11 +81,11 @@ export function StatCard({ icon: Icon, label, value, tone = 'default', hint }) {
 
 const BADGE_TONES = {
   default: 'bg-raised text-ink-muted border-line',
-  accent: 'bg-accent-soft text-accent-ink border-accent/30',
-  danger: 'bg-danger-soft text-danger border-danger/30',
-  warn: 'bg-warn-soft text-warn border-warn/30',
-  info: 'bg-raised text-info border-info/30',
-  violet: 'bg-raised text-violet border-violet/30'
+  accent: 'bg-accent-soft text-accent-ink border-accent',
+  danger: 'bg-danger-soft text-danger border-danger',
+  warn: 'bg-warn-soft text-warn border-warn',
+  info: 'bg-raised text-info border-info',
+  violet: 'bg-raised text-violet border-violet'
 };
 
 export function Badge({ children, tone = 'default', className = '' }) {
@@ -167,7 +167,7 @@ export function EmptyState({ icon: Icon, title, description, action }) {
 
 export function ErrorNote({ children }) {
   return (
-    <div className="text-sm text-danger bg-danger-soft border border-danger/30 rounded-lg px-3 py-2">
+    <div className="text-sm text-danger bg-danger-soft border border-danger rounded-lg px-3 py-2">
       {children}
     </div>
   );

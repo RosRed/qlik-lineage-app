@@ -280,7 +280,10 @@ router.get('/update-log/summary', requireConfig, handle(req =>
   ssisService.getUpdateLogSummary(req.ssisConfig, {
     database: req.query.database,
     days: parseInt(req.query.days, 10) || 30,
-    ref_societe: req.query.ref_societe || null
+    ref_societe: req.query.ref_societe || null,
+    // Date de référence choisie par l'utilisateur (AAAA-MM-JJ) — sans elle, la
+    // comparaison se fait contre l'exécution précédant immédiatement la dernière.
+    baseline: req.query.baseline || null
   })
 ));
 

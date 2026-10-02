@@ -1,8 +1,9 @@
+import { parseJson } from './parseJson';
 const BASE = '/api';
 
 export const chatApi = {
-  getHistory:  (id)           => fetch(`${BASE}/apps/${id}/chat`).then(r => r.json()),
-  clearHistory:(id)           => fetch(`${BASE}/apps/${id}/chat`, { method: 'DELETE' }).then(r => r.json()),
+  getHistory:  (id)           => fetch(`${BASE}/apps/${id}/chat`).then(parseJson),
+  clearHistory:(id)           => fetch(`${BASE}/apps/${id}/chat`, { method: 'DELETE' }).then(parseJson),
   sendMessage: (id, message, mode) =>
     fetch(`${BASE}/apps/${id}/chat`, {
       method: 'POST',

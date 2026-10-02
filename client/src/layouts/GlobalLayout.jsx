@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Outlet, useOutletContext } from 'react-router-dom';
 import {
   Globe, RefreshCw, Download, Server, BarChart3, Database,
-  AlertTriangle, Boxes, Network, Copy, CalendarClock
+  AlertTriangle, Boxes, Network, Copy, CalendarClock, Layers
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { globalApi } from '../api/qlikApi';
@@ -83,6 +83,7 @@ export default function GlobalLayout() {
           <SubTabLink to="." end icon={BarChart3} label="Synthèse" />
           <SubTabLink to="producteurs" icon={CalendarClock} label="Producteurs" />
           <SubTabLink to="qvds" icon={Database} label="QVD" count={data?.qvds.length} />
+          <SubTabLink to="streams" icon={Layers} label="Streams" />
           <SubTabLink to="apps" icon={Boxes} label="Apps" count={data?.apps.length} />
           <SubTabLink to="problemes" icon={AlertTriangle} label="Problèmes" count={problemCount} />
           <SubTabLink to="doublons" icon={Copy} label="Doublons" />

@@ -25,8 +25,8 @@ function fmtRows(n) {
 function fmtDelta(d) {
   if (d == null) return { text: '—', cls: 'text-ink-faint', Icon: Minus };
   if (d === 0) return { text: '0', cls: 'text-ink-faint', Icon: Minus };
-  if (d > 0) return { text: `+${d.toLocaleString('fr-FR')}`, cls: 'text-emerald-400', Icon: TrendingUp };
-  return { text: d.toLocaleString('fr-FR'), cls: 'text-red-400', Icon: TrendingDown };
+  if (d > 0) return { text: `+${d.toLocaleString('fr-FR')}`, cls: 'text-accent-ink', Icon: TrendingUp };
+  return { text: d.toLocaleString('fr-FR'), cls: 'text-danger', Icon: TrendingDown };
 }
 
 function fmtDuration(ms) {
@@ -204,12 +204,12 @@ function SnapshotList({ snapshots, selectedA, selectedB, onSelectA, onSelectB, o
               const isFailed = s.status === 'failed';
               const canCompare = !isRunning && !isFailed;
               const rowBg =
-                selectedA === s.id ? 'bg-blue-950/30' :
-                selectedB === s.id ? 'bg-orange-950/30' :
-                isRunning ? 'bg-emerald-950/20' :
-                isFailed  ? 'bg-red-950/20' : '';
+                selectedA === s.id ? 'bg-info-soft' :
+                selectedB === s.id ? 'bg-warn-soft' :
+                isRunning ? 'bg-accent-soft' :
+                isFailed  ? 'bg-danger-soft' : '';
               return (
-              <tr key={s.id} className={`hover:bg-raised/60 ${rowBg}`}>
+              <tr key={s.id} className={`hover:bg-raised ${rowBg}`}>
                 <td className="py-2 px-3">
                   <input type="radio" name="a" checked={selectedA === s.id}
                     disabled={!canCompare} title={canCompare ? '' : 'Snapshot en cours ou en échec'}
@@ -221,8 +221,8 @@ function SnapshotList({ snapshots, selectedA, selectedB, onSelectA, onSelectB, o
                     onChange={() => onSelectB(s.id)} />
                 </td>
                 <td className="py-2 px-3 font-mono text-info">
-                  {isRunning && <span className="mr-1 inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Capture en cours" />}
-                  {isFailed  && <span className="mr-1 inline-block w-2 h-2 rounded-full bg-red-500" title={s.error_message || 'Échec'} />}
+                  {isRunning && <span className="mr-1 inline-block w-2 h-2 rounded-full bg-accent animate-pulse" title="Capture en cours" />}
+                  {isFailed  && <span className="mr-1 inline-block w-2 h-2 rounded-full bg-danger" title={s.error_message || 'Échec'} />}
                   {s.label}
                   {isRunning && s.progress_total > 0 && (
                     <span className="ml-2 text-[10px] text-ink-muted tabular-nums">
@@ -240,7 +240,7 @@ function SnapshotList({ snapshots, selectedA, selectedB, onSelectA, onSelectB, o
                 </td>
                 <td className="py-2 px-3">
                   <button onClick={() => onDelete(s)} title="Supprimer"
-                    className="text-ink-faint hover:text-red-400">
+                    className="text-ink-faint hover:text-danger">
                     <Trash2 size={13} />
                   </button>
                 </td>
@@ -293,11 +293,11 @@ function CompareView({ aId, bId, onReset }) {
       <div className="flex items-center gap-3 mb-4">
         <Button onClick={onReset} icon={ArrowRight}>← Retour à la liste</Button>
         <div className="flex-1 flex items-center gap-3 text-xs">
-          <div className="px-3 py-1.5 rounded bg-blue-950/40 border border-blue-800/40 text-blue-200">
+          <div className="px-3 py-1.5 rounded bg-info-soft border border-info text-info">
             <b>A</b> · {data.a.label} · {fmtTime(data.a.captured_at)} · {fmtRows(data.a.row_count_total)} rows
           </div>
           <ArrowRight size={14} className="text-ink-faint" />
-          <div className="px-3 py-1.5 rounded bg-orange-950/40 border border-orange-800/40 text-orange-200">
+          <div className="px-3 py-1.5 rounded bg-warn-soft border border-warn text-warn">
             <b>B</b> · {data.b.label} · {fmtTime(data.b.captured_at)} · {fmtRows(data.b.row_count_total)} rows
           </div>
         </div>
@@ -305,11 +305,11 @@ function CompareView({ aId, bId, onReset }) {
 
       <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4">
         <Card className="!p-2"><div className="text-[10px] uppercase text-ink-faint">Changements</div><div className="text-lg font-bold">{s.totalChanges}</div></Card>
-        <Card className="!p-2 border-emerald-800/40"><div className="text-[10px] uppercase text-emerald-400">Augmentées</div><div className="text-lg font-bold text-emerald-300">{s.grew}</div></Card>
-        <Card className="!p-2 border-red-800/40"><div className="text-[10px] uppercase text-red-400">Diminuées</div><div className="text-lg font-bold text-red-300">{s.shrunk}</div></Card>
-        <Card className="!p-2 border-blue-800/40"><div className="text-[10px] uppercase text-blue-400">Ajoutées</div><div className="text-lg font-bold text-blue-300">{s.added}</div></Card>
-        <Card className="!p-2 border-yellow-800/40"><div className="text-[10px] uppercase text-yellow-400">Retirées</div><div className="text-lg font-bold text-yellow-300">{s.removed}</div></Card>
-        <Card className={`!p-2 ${s.deltaTotal !== 0 ? (s.deltaTotal > 0 ? 'border-emerald-800/40' : 'border-red-800/40') : ''}`}>
+        <Card className="!p-2 border-accent"><div className="text-[10px] uppercase text-accent-ink">Augmentées</div><div className="text-lg font-bold text-accent-ink">{s.grew}</div></Card>
+        <Card className="!p-2 border-danger"><div className="text-[10px] uppercase text-danger">Diminuées</div><div className="text-lg font-bold text-danger">{s.shrunk}</div></Card>
+        <Card className="!p-2 border-info"><div className="text-[10px] uppercase text-info">Ajoutées</div><div className="text-lg font-bold text-info">{s.added}</div></Card>
+        <Card className="!p-2 border-warn"><div className="text-[10px] uppercase text-warn">Retirées</div><div className="text-lg font-bold text-warn">{s.removed}</div></Card>
+        <Card className={`!p-2 ${s.deltaTotal !== 0 ? (s.deltaTotal > 0 ? 'border-accent' : 'border-danger') : ''}`}>
           <div className="text-[10px] uppercase text-ink-faint">Δ total rows</div>
           <div className={`text-lg font-bold ${deltaTotal.cls}`}>{deltaTotal.text}</div>
         </Card>
@@ -349,23 +349,23 @@ function CompareView({ aId, bId, onReset }) {
                 {filtered.slice(0, 500).map((d, i) => {
                   const df = fmtDelta(d.delta);
                   const bg =
-                    d.status === 'grew'    ? 'bg-emerald-950/10' :
-                    d.status === 'shrunk'  ? 'bg-red-950/10' :
-                    d.status === 'added'   ? 'bg-blue-950/10' :
-                    d.status === 'removed' ? 'bg-yellow-950/10' : '';
+                    d.status === 'grew'    ? 'bg-accent-soft' :
+                    d.status === 'shrunk'  ? 'bg-danger-soft' :
+                    d.status === 'added'   ? 'bg-info-soft' :
+                    d.status === 'removed' ? 'bg-warn-soft' : '';
                   return (
-                    <tr key={i} className={`hover:bg-raised/60 ${bg}`}>
+                    <tr key={i} className={`hover:bg-raised ${bg}`}>
                       <td className="py-2 px-3 font-mono text-info">
                         <span className="text-ink-faint">{d.schema}.</span>{d.table}
                       </td>
                       <td className="py-2 px-3 text-[11px]">{d.refSociete || <span className="text-ink-faint">—</span>}</td>
                       <td className="py-2 px-3">
                         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                          d.status === 'grew'      ? 'bg-emerald-900/40 text-emerald-300' :
-                          d.status === 'shrunk'    ? 'bg-red-900/40 text-red-300' :
-                          d.status === 'added'     ? 'bg-blue-900/40 text-blue-300' :
-                          d.status === 'removed'   ? 'bg-yellow-900/40 text-yellow-300' :
-                                                     'bg-gray-800 text-gray-400'}`}>
+                          d.status === 'grew'      ? 'bg-accent-soft text-accent-ink' :
+                          d.status === 'shrunk'    ? 'bg-danger-soft text-danger' :
+                          d.status === 'added'     ? 'bg-info-soft text-info' :
+                          d.status === 'removed'   ? 'bg-warn-soft text-warn' :
+                                                     'bg-raised text-ink-muted'}`}>
                           {d.status}
                         </span>
                       </td>
@@ -381,7 +381,7 @@ function CompareView({ aId, bId, onReset }) {
               </tbody>
             </table>
             {filtered.length > 500 && (
-              <div className="p-2 text-center text-[11px] text-ink-faint bg-raised/30">
+              <div className="p-2 text-center text-[11px] text-ink-faint bg-raised">
                 Affichage limité à 500 lignes — utilisez les filtres pour raffiner.
               </div>
             )}
@@ -480,12 +480,12 @@ export default function NamedSnapshotsPage() {
           Comparer A → B
         </Button>
         <Button onClick={wipe}>
-          <Trash2 size={13} className="inline mr-1 text-red-400" /> Tout vider
+          <Trash2 size={13} className="inline mr-1 text-danger" /> Tout vider
         </Button>
       </div>
 
       {selectedA && selectedB && selectedA === selectedB && (
-        <div className="text-xs text-yellow-400 mb-2 flex items-center gap-1.5">
+        <div className="text-xs text-warn mb-2 flex items-center gap-1.5">
           <AlertCircle size={12} /> A et B doivent être des snapshots différents.
         </div>
       )}

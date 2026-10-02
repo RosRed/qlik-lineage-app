@@ -148,8 +148,8 @@ export default function SsisSettingsPage() {
         {testResult && (
           <div className={`mt-4 rounded border px-3 py-2 text-xs ${
             testResult.ok
-              ? 'border-emerald-800/40 bg-emerald-900/10 text-emerald-300'
-              : 'border-red-800/40 bg-red-900/10 text-red-300'}`}>
+              ? 'border-accent bg-accent-soft text-accent-ink'
+              : 'border-danger bg-danger-soft text-danger'}`}>
             {testResult.ok ? (
               <>
                 <div className="flex items-center gap-1.5 font-medium">
@@ -157,7 +157,7 @@ export default function SsisSettingsPage() {
                 </div>
                 <div className="text-ink-muted mt-1">Base courante : <code>{testResult.currentDb}</code></div>
                 {testResult.hasSsisDb === false && (
-                  <div className="text-yellow-300 mt-1">
+                  <div className="text-warn mt-1">
                     ⚠ La base SSISDB n'est pas visible depuis cet utilisateur — vérifiez les droits.
                   </div>
                 )}

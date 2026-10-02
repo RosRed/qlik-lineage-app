@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Zap, Brain, TrendingUp, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { parseJson } from '../api/parseJson';
 
 export default function ApiUsageWidget() {
   const [stats, setStats] = useState(null);
@@ -7,7 +8,7 @@ export default function ApiUsageWidget() {
 
   const load = useCallback(() => {
     fetch('/api/usage')
-      .then(r => r.json())
+      .then(parseJson)
       .then(setStats)
       .catch(() => {});
   }, []);
@@ -38,11 +39,11 @@ export default function ApiUsageWidget() {
   const chatCalls = (byType['chat']?.total_calls || 0);
 
   return (
-    <div className="border-t border-gray-800 text-xs">
+    <div className="border-t border-line text-xs">
       {/* Header cliquable */}
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between px-3 py-2 text-gray-600 hover:text-gray-400 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 text-ink-faint hover:text-ink-muted transition-colors"
       >
         <div className="flex items-center gap-1.5">
           <TrendingUp size={11} />
@@ -54,31 +55,31 @@ export default function ApiUsageWidget() {
       {open && (
         <div className="px-3 pb-3 space-y-2">
           {/* Total */}
-          <div className="bg-gray-900 rounded-lg p-2.5 space-y-1.5">
-            <p className="text-gray-500 uppercase tracking-wider text-[10px] font-semibold mb-1">Total</p>
-            <div className="flex justify-between text-gray-400">
-              <span className="flex items-center gap-1"><Brain size={10} className="text-violet-400" /> Analyses</span>
+          <div className="bg-surface rounded-lg p-2.5 space-y-1.5">
+            <p className="text-ink-muted uppercase tracking-wider text-[10px] font-semibold mb-1">Total</p>
+            <div className="flex justify-between text-ink-muted">
+              <span className="flex items-center gap-1"><Brain size={10} className="text-violet" /> Analyses</span>
               <span className="font-mono">{analyzeCalls}</span>
             </div>
-            <div className="flex justify-between text-gray-400">
-              <span className="flex items-center gap-1"><Brain size={10} className="text-blue-400" /> Chat Claude</span>
+            <div className="flex justify-between text-ink-muted">
+              <span className="flex items-center gap-1"><Brain size={10} className="text-info" /> Chat Claude</span>
               <span className="font-mono">{chatCalls}</span>
             </div>
-            <div className="flex justify-between text-gray-400">
-              <span className="flex items-center gap-1"><Zap size={10} className="text-yellow-400" /> Local / Cache</span>
-              <span className="font-mono text-yellow-500">{localSaved}</span>
+            <div className="flex justify-between text-ink-muted">
+              <span className="flex items-center gap-1"><Zap size={10} className="text-warn" /> Local / Cache</span>
+              <span className="font-mono text-warn">{localSaved}</span>
             </div>
-            <div className="border-t border-gray-800 pt-1.5 flex justify-between text-gray-300 font-medium">
+            <div className="border-t border-line pt-1.5 flex justify-between text-ink font-medium">
               <span>Coût estimé</span>
-              <span className="font-mono text-emerald-400">${totalCostUsd}</span>
+              <span className="font-mono text-accent-ink">${totalCostUsd}</span>
             </div>
           </div>
 
           {/* Aujourd'hui */}
           {todayCalls > 0 && (
-            <div className="bg-gray-900 rounded-lg p-2.5">
-              <p className="text-gray-500 uppercase tracking-wider text-[10px] font-semibold mb-1">Aujourd'hui</p>
-              <div className="flex justify-between text-gray-400">
+            <div className="bg-surface rounded-lg p-2.5">
+              <p className="text-ink-muted uppercase tracking-wider text-[10px] font-semibold mb-1">Aujourd'hui</p>
+              <div className="flex justify-between text-ink-muted">
                 <span>{todayCalls} appel(s)</span>
                 <span className="font-mono">${todayCost}</span>
               </div>
@@ -87,7 +88,7 @@ export default function ApiUsageWidget() {
 
           {/* Tokens */}
           {stats.totals?.input_tokens > 0 && (
-            <div className="text-gray-700 space-y-0.5">
+            <div className="text-ink-faint space-y-0.5">
               <div className="flex justify-between">
                 <span>Tokens input</span>
                 <span className="font-mono">{(stats.totals.input_tokens || 0).toLocaleString()}</span>
@@ -102,7 +103,7 @@ export default function ApiUsageWidget() {
           {/* Reset */}
           <button
             onClick={reset}
-            className="flex items-center gap-1 text-gray-700 hover:text-red-400 transition-colors mt-1"
+            className="flex items-center gap-1 text-ink-faint hover:text-danger transition-colors mt-1"
           >
             <RotateCcw size={10} />
             Réinitialiser

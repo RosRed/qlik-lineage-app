@@ -176,8 +176,79 @@ async function listApps(config) {
   return apps.map(mapQrsApp);
 }
 
-/** Script d'une app via l'Engine à travers le proxy (wss sur 443, cookie de session) */
-function getAppScript(config, qlikAppId, { timeoutMs = 45000 } = {}) {
+/**
+ * Ouvre un document via l'Engine à travers le proxy (wss sur 443, cookie de
+ * session) et passe à `fn` un émetteur JSON-RPC ainsi que le handle du doc.
+ *
+ * Tout ce qui se lit dans une app passe par là : script, mesures maîtres,
+ * dimensions, feuilles, objets, variables. Le socket est refermé quoi qu'il
+ * arrive, et un timeout global évite qu'une app qui ne répond pas bloque une
+ * synchronisation entière.
+ */
+/**
+ * Session Engine SANS ouvrir de document : le websocket vise `/app/engineData`,
+ * le point d'entree conventionnel de la classe Global. C'est le seul moyen
+ * d'appeler `CreateApp`, qui ne s'adresse pas a un document mais a la session
+ * elle-meme (handle -1).
+ */
+function withGlobal(config, fn, { timeoutMs = 60000 } = {}) {
+  return new Promise(async (resolve, reject) => {
+    let cookie;
+    try { cookie = await getSession(config); }
+    catch (e) { return reject(e); }
+
+    const host = hostOf(config);
+    const ws = new WebSocket(`wss://${host}/app/engineData`, {
+      rejectUnauthorized: !!config.reject_unauthorized,
+      headers: { 'Cookie': cookie, 'Origin': `https://${host}`, 'User-Agent': UA }
+    });
+
+    let msgId = 0;
+    const pending = new Map();
+    let done = false;
+    const timer = setTimeout(() => {
+      ws.terminate();
+      finish(new Error('Timeout Engine (session globale)'));
+    }, timeoutMs);
+
+    function finish(err, value) {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try { ws.close(); } catch (_) {}
+      if (err) reject(err); else resolve(value);
+    }
+
+    const send = (method, handle, params) => new Promise((res, rej) => {
+      const id = ++msgId;
+      pending.set(id, { res, rej });
+      ws.send(JSON.stringify({ jsonrpc: '2.0', id, method, handle, params }));
+    });
+
+    ws.on('open', async () => {
+      try { finish(null, await fn({ send })); }
+      catch (e) { finish(e); }
+    });
+
+    ws.on('message', (raw) => {
+      let msg;
+      try { msg = JSON.parse(raw.toString()); } catch { return; }
+      if (msg.method === 'OnAuthenticationInformation' && msg.params && msg.params.mustAuthenticate) {
+        return finish(new Error('Session refusee par le proxy'));
+      }
+      if (msg.id && pending.has(msg.id)) {
+        const { res, rej } = pending.get(msg.id);
+        pending.delete(msg.id);
+        if (msg.error) rej(new Error(`Engine API: ${msg.error.message || JSON.stringify(msg.error)}`));
+        else res(msg.result || {});
+      }
+    });
+
+    ws.on('error', (e) => finish(new Error(`Connexion Engine echouee : ${e.message}`)));
+  });
+}
+
+function withDoc(config, qlikAppId, fn, { timeoutMs = 45000, noData = true } = {}) {
   return new Promise(async (resolve, reject) => {
     let cookie;
     try { cookie = await getSession(config); }
@@ -186,19 +257,24 @@ function getAppScript(config, qlikAppId, { timeoutMs = 45000 } = {}) {
     const host = hostOf(config);
     const ws = new WebSocket(`wss://${host}/app/${qlikAppId}`, {
       rejectUnauthorized: !!config.reject_unauthorized,
-      headers: {
-        'Cookie': cookie,
-        'Origin': `https://${host}`,
-        'User-Agent': UA
-      }
+      headers: { 'Cookie': cookie, 'Origin': `https://${host}`, 'User-Agent': UA }
     });
 
     let msgId = 0;
     const pending = new Map();
+    let done = false;
     const timer = setTimeout(() => {
       ws.terminate();
-      reject(new Error(`Timeout Engine (proxy) pour l'app ${qlikAppId}`));
+      finish(new Error(`Timeout Engine (proxy) pour l'app ${qlikAppId}`));
     }, timeoutMs);
+
+    function finish(err, value) {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try { ws.close(); } catch (_) {}
+      if (err) reject(err); else resolve(value);
+    }
 
     const send = (method, handle, params) => new Promise((res, rej) => {
       const id = ++msgId;
@@ -206,21 +282,21 @@ function getAppScript(config, qlikAppId, { timeoutMs = 45000 } = {}) {
       ws.send(JSON.stringify({ jsonrpc: '2.0', id, method, handle, params }));
     });
 
-    const finish = (err, script) => {
-      clearTimeout(timer);
-      try { ws.close(); } catch (_) {}
-      if (err) reject(err); else resolve(script);
-    };
-
     ws.on('open', async () => {
       try {
-        const doc = await send('OpenDoc', -1, [qlikAppId, '', '', '', true]);
+        // `noData` décide si le document est ouvert AVEC ses données.
+        //
+        // En lecture on ouvre sans (rapide, aucune RAM consommée). Mais pour
+        // ÉCRIRE c'est un piège : `DoSave` sur une session nodata réécrit le
+        // .qvf sans les données, et l'app perd tout son contenu — mesuré à
+        // 97 % du fichier évaporé (5,80 Mo → 0,17 Mo). Toute opération qui se
+        // termine par un DoSave doit donc passer noData: false.
+        const doc = await send('OpenDoc', -1, [qlikAppId, '', '', '', !!noData]);
         const handle = doc.qReturn && doc.qReturn.qHandle;
         if (handle === undefined || handle === null) {
           return finish(new Error(`OpenDoc a échoué pour ${qlikAppId}`));
         }
-        const scriptRes = await send('GetScript', handle, []);
-        finish(null, scriptRes.qScript || '');
+        finish(null, await fn({ send, handle }));
       } catch (e) {
         finish(e);
       }
@@ -245,4 +321,11 @@ function getAppScript(config, qlikAppId, { timeoutMs = 45000 } = {}) {
   });
 }
 
-module.exports = { testConnection, listApps, getAppScript, qrsRequest };
+/** Script d'une app via l'Engine à travers le proxy. */
+function getAppScript(config, qlikAppId, opts = {}) {
+  return withDoc(config, qlikAppId,
+    async ({ send, handle }) => (await send('GetScript', handle, [])).qScript || '',
+    opts);
+}
+
+module.exports = { testConnection, listApps, getAppScript, qrsRequest, withDoc, withGlobal };

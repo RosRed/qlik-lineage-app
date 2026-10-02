@@ -9,7 +9,7 @@ import { AppChips, QvdStatusBadge } from '../../components/global/bits.jsx';
 
 function QvdDetail({ qvd }) {
   return (
-    <tr className="bg-raised/50">
+    <tr className="bg-raised">
       <td />
       <td colSpan={4} className="py-3 pr-3">
         <div className="grid md:grid-cols-2 gap-5 text-[13px]">
@@ -216,11 +216,11 @@ export default function QvdsPage() {
       {taskMap && (
         <div className="flex items-center gap-3 text-[10px] text-ink-faint mb-3">
           <span className="uppercase tracking-wider">Légende tâches :</span>
-          <span className="inline-flex items-center gap-1"><Clock size={11} className="text-emerald-400" /> planifiée</span>
-          <span className="inline-flex items-center gap-1"><Link2 size={11} className="text-violet-400" /> chaînée</span>
-          <span className="inline-flex items-center gap-1"><Zap size={11} className="text-emerald-400" /> planifiée + chaînée</span>
-          <span className="inline-flex items-center gap-1"><User size={11} className="text-yellow-400" /> manuelle</span>
-          <span className="inline-flex items-center gap-1"><Ban size={11} className="text-red-400" /> aucune tâche</span>
+          <span className="inline-flex items-center gap-1"><Clock size={11} className="text-accent-ink" /> planifiée</span>
+          <span className="inline-flex items-center gap-1"><Link2 size={11} className="text-violet" /> chaînée</span>
+          <span className="inline-flex items-center gap-1"><Zap size={11} className="text-accent-ink" /> planifiée + chaînée</span>
+          <span className="inline-flex items-center gap-1"><User size={11} className="text-warn" /> manuelle</span>
+          <span className="inline-flex items-center gap-1"><Ban size={11} className="text-danger" /> aucune tâche</span>
         </div>
       )}
 
@@ -258,7 +258,7 @@ export default function QvdsPage() {
               {filtered.map(x => (
                 <React.Fragment key={x.name}>
                   <tr
-                    className="hover:bg-raised/60 cursor-pointer"
+                    className="hover:bg-raised cursor-pointer"
                     onClick={() => setExpanded(expanded === x.name ? null : x.name)}
                   >
                     <td className="py-2 pr-1 text-ink-faint align-top pt-2.5">

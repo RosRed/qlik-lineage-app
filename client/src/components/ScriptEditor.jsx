@@ -29,8 +29,8 @@ export default function ScriptEditor({
 
   if (!app) {
     return (
-      <div className="w-[350px] min-w-[350px] bg-gray-900/50 border-r border-gray-800 flex items-center justify-center">
-        <div className="text-center text-gray-600 p-6">
+      <div className="w-[350px] min-w-[350px] bg-surface border-r border-line flex items-center justify-center">
+        <div className="text-center text-ink-faint p-6">
           <FileCode size={40} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm">Sélectionnez ou créez<br />une application</p>
         </div>
@@ -39,14 +39,14 @@ export default function ScriptEditor({
   }
 
   return (
-    <div className="w-[350px] min-w-[350px] bg-gray-900/50 border-r border-gray-800 flex flex-col">
+    <div className="w-[350px] min-w-[350px] bg-surface border-r border-line flex flex-col">
       {/* Header */}
-      <div className="p-3 border-b border-gray-800">
+      <div className="p-3 border-b border-line">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Script Qlik / SQL</h2>
+          <h2 className="text-xs font-semibold text-ink uppercase tracking-wider">Script Qlik / SQL</h2>
           <button
             onClick={() => fileRef.current.click()}
-            className="flex items-center gap-1 text-xs text-gray-400 hover:text-emerald-400 transition-colors"
+            className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent-ink transition-colors"
           >
             <Upload size={12} />
             Upload
@@ -55,13 +55,13 @@ export default function ScriptEditor({
         </div>
 
         {/* Toggle Local / Claude */}
-        <div className="flex rounded-lg overflow-hidden border border-gray-700 mt-2">
+        <div className="flex rounded-lg overflow-hidden border border-line mt-2">
           <button
             onClick={() => onModeChange('local')}
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium transition-colors ${
               isLocal
-                ? 'bg-yellow-600/20 text-yellow-400 border-r border-yellow-700/50'
-                : 'bg-gray-800 text-gray-500 hover:text-gray-300 border-r border-gray-700'
+                ? 'bg-warn text-warn border-r border-warn'
+                : 'bg-raised text-ink-muted hover:text-ink border-r border-line'
             }`}
           >
             <Zap size={11} />
@@ -71,8 +71,8 @@ export default function ScriptEditor({
             onClick={() => onModeChange('claude')}
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium transition-colors ${
               !isLocal
-                ? 'bg-violet-600/20 text-violet-400'
-                : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                ? 'bg-violet text-violet'
+                : 'bg-raised text-ink-muted hover:text-ink'
             }`}
           >
             <Brain size={11} />
@@ -81,7 +81,7 @@ export default function ScriptEditor({
         </div>
 
         {/* Description du mode */}
-        <p className="text-xs text-gray-600 mt-1.5">
+        <p className="text-xs text-ink-faint mt-1.5">
           {isLocal
             ? '⚡ Analyse instantanée, gratuite, par regex'
             : '🤖 Analyse sémantique profonde par IA'}
@@ -90,7 +90,7 @@ export default function ScriptEditor({
 
       {/* Zone de texte */}
       <textarea
-        className="flex-1 bg-transparent text-gray-200 text-xs font-mono p-4 resize-none outline-none border-none leading-relaxed placeholder-gray-700"
+        className="flex-1 bg-transparent text-ink text-xs font-mono p-4 resize-none outline-none border-none leading-relaxed placeholder-ink-faint"
         placeholder={`// Collez votre script Qlik ici\n// Exemple :\n[FACT_VENTES]:\nNoConcatenate\nLOAD\n  ID_COMMANDE,\n  DATE_CMD,\n  MONTANT_HT\nFROM [lib://QVD/ventes.qvd] (qvd);\n\n[DIM_CLIENT]:\nNoConcatenate\nLOAD\n  ID_CLIENT,\n  NOM_CLIENT,\n  VILLE\nFROM [lib://QVD/clients.qvd] (qvd);`}
         value={script}
         onChange={e => onScriptChange(e.target.value)}
@@ -98,20 +98,20 @@ export default function ScriptEditor({
       />
 
       {/* Footer */}
-      <div className="p-3 border-t border-gray-800">
+      <div className="p-3 border-t border-line">
         {/* Stats script */}
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-gray-600">
+          <span className="text-xs text-ink-faint">
             {script.length > 0 ? `${script.split('\n').length} lignes · ${script.length} car.` : 'Aucun script'}
           </span>
           {/* Badge analyse existante */}
           {analysis && (
             <span className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${
               isCached
-                ? 'bg-blue-900/30 text-blue-400 border border-blue-700/40'
+                ? 'bg-info-soft text-info border border-info'
                 : analysisMode === 'local'
-                  ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-700/40'
-                  : 'bg-violet-900/30 text-violet-400 border border-violet-700/40'
+                  ? 'bg-warn-soft text-warn border border-warn'
+                  : 'bg-violet-soft text-violet border border-violet'
             }`}>
               {isCached ? (
                 <><HardDrive size={10} /> Cache</>
@@ -130,8 +130,8 @@ export default function ScriptEditor({
           disabled={analyzing || !script.trim()}
           className={`w-full flex items-center justify-center gap-2 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors ${
             isLocal
-              ? 'bg-yellow-600 hover:bg-yellow-500'
-              : 'bg-violet-600 hover:bg-violet-500'
+              ? 'bg-warn hover:bg-warn'
+              : 'bg-violet hover:bg-violet'
           }`}
         >
           {analyzing ? (
@@ -148,7 +148,7 @@ export default function ScriptEditor({
 
         {/* Info cache (Claude only) */}
         {!isLocal && (
-          <p className="text-xs text-gray-700 mt-1.5 text-center">
+          <p className="text-xs text-ink-faint mt-1.5 text-center">
             💾 Script inchangé → cache utilisé automatiquement
           </p>
         )}

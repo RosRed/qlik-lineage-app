@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Boxes, Plus, Pencil, Trash2, Check, X, Database, Loader2 } from 'lucide-react';
+import { Pencil, Trash2, Check, X, Database, Loader2, Boxes, SearchX } from 'lucide-react';
 import { useAppsList } from '../context/AppsContext';
 import {
-  PageHeader, PageBody, Button, SearchInput, Select, Badge, EmptyState
+  PageBody, Button, SearchInput, Select, Badge, EmptyState
 } from '../components/ui/primitives';
 
 /* Normalisation accents/casse pour la recherche */
@@ -15,7 +15,7 @@ const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-
  * de contexte, et bloquait sa largeur en permanence.
  */
 export default function AppsListPage() {
-  const { apps, loading, createApp, renameApp, removeApp } = useAppsList();
+  const { apps, loading, renameApp, removeApp } = useAppsList();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -29,8 +29,6 @@ export default function AppsListPage() {
   const [streamFilter, setStreamFilter] = useState('');
   const [stateFilter, setStateFilter] = useState('');
 
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
 
@@ -50,16 +48,6 @@ export default function AppsListPage() {
     });
   }, [apps, search, streamFilter, stateFilter]);
 
-  const handleCreate = async () => {
-    if (!newName.trim()) return;
-    const app = await createApp(newName.trim());
-    if (app) {
-      setNewName('');
-      setCreating(false);
-      navigate(`/apps/${app.id}`);
-    }
-  };
-
   const handleRename = async (id) => {
     if (!editName.trim()) return;
     await renameApp(id, editName.trim());
@@ -73,37 +61,6 @@ export default function AppsListPage() {
 
   return (
     <>
-      <PageHeader
-        icon={Boxes}
-        title="Applications"
-        subtitle={loading ? 'Chargement…' : `${apps.length} application${apps.length !== 1 ? 's' : ''}`}
-        actions={
-          !creating ? (
-            <Button variant="primary" icon={Plus} onClick={() => setCreating(true)}>
-              Nouvelle app
-            </Button>
-          ) : (
-            <div className="flex items-center gap-1">
-              <input
-                autoFocus
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handleCreate();
-                  if (e.key === 'Escape') { setCreating(false); setNewName(''); }
-                }}
-                placeholder="Nom de la nouvelle app"
-                className="bg-canvas border border-line rounded-lg px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
-              />
-              <Button variant="primary" onClick={handleCreate}><Check size={14} /></Button>
-              <Button variant="ghost" onClick={() => { setCreating(false); setNewName(''); }}>
-                <X size={14} />
-              </Button>
-            </div>
-          )
-        }
-      />
-
       <div className="shrink-0 flex items-center gap-2 flex-wrap px-5 py-3 border-b border-line bg-surface">
         <SearchInput
           value={search}
@@ -138,14 +95,18 @@ export default function AppsListPage() {
           <EmptyState
             icon={Boxes}
             title="Aucune application"
-            description="Créez une app pour coller un script, ou importez depuis le serveur Qlik."
-            action={<Button variant="primary" icon={Plus} onClick={() => setCreating(true)}>Créer une app</Button>}
+            description="Utilisez « Nouvelle app » en haut à droite pour coller un script, ou importez depuis le serveur Qlik."
           />
         ) : filtered.length === 0 ? (
           <EmptyState
-            icon={Boxes}
+            icon={SearchX}
             title="Aucune app ne correspond aux filtres"
             description="Élargissez la recherche ou retirez un filtre."
+            action={
+              <Button onClick={() => { setSearch(''); setStreamFilter(''); setStateFilter(''); }}>
+                Réinitialiser les filtres
+              </Button>
+            }
           />
         ) : (
           <div className="overflow-x-auto">
@@ -164,7 +125,7 @@ export default function AppsListPage() {
                 {filtered.map(app => (
                   <tr
                     key={app.id}
-                    className="hover:bg-raised/60 cursor-pointer group"
+                    className="hover:bg-raised cursor-pointer group"
                     onClick={() => editingId !== app.id && navigate(`/apps/${app.id}`)}
                   >
                     <td className="py-2.5 pl-5 pr-3">

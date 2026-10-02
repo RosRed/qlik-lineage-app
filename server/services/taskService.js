@@ -13,6 +13,7 @@
 
 const { buildGlobalLineage } = require('./globalLineage');
 const { cachedQrs, cachedAnalysis } = require('../lib/qrsCache');
+const { buildWeekPlanning } = require('./schedulePlanner');
 
 const EXEC_STATUS = {
   0: { code: 'never', label: 'Jamais lancée' },
@@ -55,7 +56,14 @@ async function fetchTasks(config) {
       name: s.name,
       enabled: s.enabled,
       startDate: s.startDate || null,
-      expiration: s.expirationDate && !String(s.expirationDate).startsWith('9999') ? s.expirationDate : null
+      expiration: s.expirationDate && !String(s.expirationDate).startsWith('9999') ? s.expirationDate : null,
+      // Règle de récurrence brute — décodée par schedulePlanner pour construire
+      // le calendrier hebdomadaire. Conservée telle quelle pour rester
+      // vérifiable dans l'UI face à la QMC.
+      incrementOption: s.incrementOption ?? null,
+      incrementDescription: s.incrementDescription || null,
+      schemaFilterDescription: s.schemaFilterDescription || null,
+      timeZone: s.timeZone || null
     });
   }
   for (const c of composites || []) {
@@ -345,6 +353,9 @@ async function computeAnalyzeTasks(config) {
   for (const t of tasks) {
     const local = t.qlikAppId ? localByQlikId.get(t.qlikAppId) : null;
     t.imported = !!local;
+    // Id de l'app dans la base locale — permet au client de lier la ligne vers
+    // /apps/:id. Nul tant que l'app n'a pas ete importee dans l'outil.
+    t.localAppId = local ? local.appId : null;
     t.producedQvds = local ? local.producedQvds : [];
     t.consumedQvds = local ? local.consumedQvds : [];
     t.appRole = local ? local.role : null;
@@ -412,6 +423,16 @@ async function computeAnalyzeTasks(config) {
   const count = (p) => tasks.filter(t => t.problems.includes(p)).length;
   const byReco = (r) => tasks.filter(t => t.recommendation === r).length;
 
+  // Calendrier de la semaine en cours : occurrences planifiées + héritage des
+  // jours par les tâches chaînées (voir schedulePlanner).
+  const planning = buildWeekPlanning(tasks, chainData.upstreamOf);
+
+  // Base d'URL du hub Qlik, pour que le client puisse lier chaque ligne à son
+  // application. Le planificateur reste pur — c'est ici qu'on connaît le host.
+  // Pas de préfixe de virtual proxy en configuration : on vise le proxy par défaut.
+  const host = String(config.host || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  planning.hubBase = host ? `https://${host}/sense/app/` : null;
+
   return {
     generatedAt: new Date().toISOString(),
     stats: {
@@ -445,6 +466,7 @@ async function computeAnalyzeTasks(config) {
     },
     tasks: tasks.sort((a, b) => b.cleanupScore - a.cleanupScore || a.name.localeCompare(b.name)),
     chains: chainData.chains,
+    planning,
     duplicateQvdProduction
   };
 }

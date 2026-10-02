@@ -5,6 +5,7 @@ import { adminApi } from '../api/qlikApi';
 import { useTheme } from '../context/ThemeContext';
 import { useAppsList } from '../context/AppsContext';
 import { PageHeader, PageBody, Card, Button } from '../components/ui/primitives';
+import { parseJson } from '../api/parseJson';
 
 /*
  * Rassemble ce qui vivait dispersé dans l'ancienne UI :
@@ -23,13 +24,13 @@ export default function SettingsPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    fetch('/api/usage').then(r => r.json()).then(setUsage).catch(() => {});
+    fetch('/api/usage').then(parseJson).then(setUsage).catch(() => {});
   }, []);
 
   const resetUsage = async () => {
     if (!window.confirm("Réinitialiser les statistiques d'utilisation ?")) return;
     await fetch('/api/usage', { method: 'DELETE' });
-    const fresh = await fetch('/api/usage').then(r => r.json());
+    const fresh = await fetch('/api/usage').then(parseJson);
     setUsage(fresh);
     toast.success('Statistiques réinitialisées');
   };

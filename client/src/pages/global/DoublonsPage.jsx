@@ -38,7 +38,7 @@ function FamilyRow({ family, index, expanded, onToggle }) {
   const orphanTone = family.orphaned > 0 ? 'danger' : 'default';
   return (
     <>
-      <tr className="hover:bg-raised/60 cursor-pointer" onClick={onToggle}>
+      <tr className="hover:bg-raised cursor-pointer" onClick={onToggle}>
         <td className="py-2.5 pl-3 pr-2 text-ink-faint align-top pt-3">
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </td>
@@ -62,7 +62,7 @@ function FamilyRow({ family, index, expanded, onToggle }) {
         </td>
       </tr>
       {expanded && (
-        <tr className="bg-raised/40">
+        <tr className="bg-raised">
           <td />
           <td colSpan={5} className="pb-3 pr-3">
             <table className="w-full text-[12px]">
@@ -204,7 +204,7 @@ function TwinRow({ twin, index, expanded, onToggle }) {
   const strong = twin.overlapPct >= 80;
   return (
     <>
-      <tr className="hover:bg-raised/60 cursor-pointer" onClick={onToggle}>
+      <tr className="hover:bg-raised cursor-pointer" onClick={onToggle}>
         <td className="py-2.5 pl-3 pr-2 text-ink-faint align-top pt-3">
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </td>
@@ -231,7 +231,7 @@ function TwinRow({ twin, index, expanded, onToggle }) {
         </td>
       </tr>
       {expanded && (
-        <tr className="bg-raised/40">
+        <tr className="bg-raised">
           <td />
           <td colSpan={7} className="pb-3 pr-3 pt-1">
             <div className="text-[11px] uppercase tracking-wide text-ink-muted mb-1.5">

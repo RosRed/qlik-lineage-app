@@ -46,11 +46,11 @@ export function QvdStatusBadge({ status }) {
  * `disabled: true` la barre en gris désaturé.
  */
 const TASK_ICONS = {
-  schedule: { Icon: Clock, cls: 'text-emerald-400', tip: 'Tâche planifiée' },
-  chain:    { Icon: Link2, cls: 'text-violet-400',  tip: 'Déclenchée en chaîne' },
-  mixte:    { Icon: Zap,   cls: 'text-emerald-400', tip: 'Planifiée + chaînée' },
-  manual:   { Icon: User,  cls: 'text-yellow-400',  tip: 'Tâche manuelle (pas de trigger)' },
-  none:     { Icon: Ban,   cls: 'text-red-400',     tip: 'Pas de tâche de reload' },
+  schedule: { Icon: Clock, cls: 'text-accent-ink', tip: 'Tâche planifiée' },
+  chain:    { Icon: Link2, cls: 'text-violet',  tip: 'Déclenchée en chaîne' },
+  mixte:    { Icon: Zap,   cls: 'text-accent-ink', tip: 'Planifiée + chaînée' },
+  manual:   { Icon: User,  cls: 'text-warn',  tip: 'Tâche manuelle (pas de trigger)' },
+  none:     { Icon: Ban,   cls: 'text-danger',     tip: 'Pas de tâche de reload' },
   unknown:  { Icon: HelpCircle, cls: 'text-ink-faint', tip: 'Statut inconnu' }
 };
 

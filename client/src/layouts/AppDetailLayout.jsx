@@ -1,13 +1,16 @@
-import React from 'react';
-import { Outlet, useParams, useOutletContext, Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Outlet, useParams, useOutletContext, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutGrid, Database, GitBranch, Network, MessageSquare, FileCode,
-  Zap, Brain, HardDrive, Loader2, ArrowLeft, Boxes, Clock
+  Zap, Brain, HardDrive, Loader2, ArrowLeft, Boxes, Clock, FolderGit2, Copy, GitPullRequestArrow
 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { appsApi } from '../api/appsApi';
 import { useAppsList } from '../context/AppsContext';
 import { useAppWorkspace } from '../hooks/useAppWorkspace';
 import { PageHeader, SubTabs, Badge, EmptyState, Button, Spinner } from '../components/ui/primitives';
 import SubTabLink from '../components/ui/SubTabLink';
+import GitSyncModal from '../components/GitSyncModal.jsx';
 
 /*
  * Écran d'une application : /apps/:id/*
@@ -71,8 +74,12 @@ function AnalyzeControls({ analyzeMode, setAnalyzeMode, analyzing, onAnalyze, ha
 
 export default function AppDetailLayout() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { apps, loading: loadingApps } = useAppsList();
   const workspace = useAppWorkspace(id);
+  const [exporting, setExporting] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+  const [showSync, setShowSync] = useState(false);
   const { script, analysis, analyzing, analyzeMode, setAnalyzeMode, saveAndAnalyze } = workspace;
 
   const app = apps.find(a => String(a.id) === String(id));
@@ -111,6 +118,57 @@ export default function AppDetailLayout() {
                     : <><Brain size={11} /> Claude</>}
               </Badge>
             )}
+            {app.qlik_app_id && (
+              <Button variant="ghost" icon={Copy} disabled={duplicating}
+                title="Créer une copie complète de l'app côté Qlik (données et objets inclus)"
+                onClick={async () => {
+                  const nom = window.prompt('Nom de la copie :', `${app.name} (copie)`);
+                  if (!nom) return;
+                  setDuplicating(true);
+                  try {
+                    const r = await appsApi.duplicate(app.id, nom);
+                    toast.success(`Copie créée : ${r.name}`);
+                    navigate(`/apps/${r.appId}`);
+                  } catch (e) {
+                    toast.error(e.error || e.message || 'Échec de la duplication');
+                  } finally {
+                    setDuplicating(false);
+                  }
+                }}>
+                {duplicating ? 'Copie…' : 'Dupliquer'}
+              </Button>
+            )}
+            {app.qlik_app_id && (
+              <Button variant="ghost" icon={GitPullRequestArrow}
+                title="Comparer le dossier d'export avec l'app, puis réappliquer les modifications"
+                onClick={() => setShowSync(true)}>
+                Appliquer
+              </Button>
+            )}
+            {app.qlik_app_id && (
+              <Button variant="ghost" icon={FolderGit2} disabled={exporting}
+                title="Écrire l'app (script par sections, mesures, feuilles, variables) au format Gitoqlok"
+                onClick={async () => {
+                  setExporting(true);
+                  try {
+                    const r = await appsApi.exportGitoqlok(app.id);
+                    // Le chemin est la premiere question qu'on se pose apres
+                    // un export : on l'affiche plutot que de le faire chercher.
+                    toast.success(
+                      `${r.tabs} sections · ${r.counts.measures} mesures · ` +
+                      `${r.counts.sheets} feuilles · ${r.counts.variables} variables
+${r.outDir}`,
+                      { duration: 10000, style: { maxWidth: '560px', wordBreak: 'break-all' } }
+                    );
+                  } catch (e) {
+                    toast.error(e.error || e.message || "Échec de l'export");
+                  } finally {
+                    setExporting(false);
+                  }
+                }}>
+                {exporting ? 'Export…' : 'Export Git'}
+              </Button>
+            )}
             {/* Lien Apps → Tâches : jump vers /tasks préfiltré sur l'app courante */}
             <Link to={`/tasks?app=${encodeURIComponent(app.name)}`}
                   title="Voir les tâches de reload de cette app">
@@ -132,6 +190,10 @@ export default function AppDetailLayout() {
       </PageHeader>
 
       <Outlet context={{ app, ...workspace }} />
+
+      {showSync && (
+        <GitSyncModal app={app} onClose={() => setShowSync(false)} />
+      )}
     </>
   );
 }

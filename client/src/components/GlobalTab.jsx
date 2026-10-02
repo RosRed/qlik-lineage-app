@@ -77,9 +77,9 @@ function layoutGraph(rawNodes, rawEdges) {
 
 function GlobalGraph({ graph }) {
   const { nodes, edges } = useMemo(() => layoutGraph(graph.nodes, graph.edges), [graph]);
-  if (!nodes.length) return <div className="p-8 text-center text-xs text-gray-600">Aucune donnée de graphe — importe ou analyse des apps d'abord.</div>;
+  if (!nodes.length) return <div className="p-8 text-center text-xs text-ink-faint">Aucune donnée de graphe — importe ou analyse des apps d'abord.</div>;
   return (
-    <div style={{ height: 420 }} className="border border-gray-800 rounded-lg overflow-hidden bg-gray-950">
+    <div style={{ height: 420 }} className="border border-line rounded-lg overflow-hidden bg-canvas">
       <ReactFlow nodes={nodes} edges={edges} fitView proOptions={{ hideAttribution: true }}>
         <Background color="#1f2937" gap={20} />
         <Controls showInteractive={false} />
@@ -93,13 +93,13 @@ function GlobalGraph({ graph }) {
 
 function StatCard({ icon: Icon, label, value, tone = 'default' }) {
   const tones = {
-    default: 'border-gray-800 text-gray-200',
-    warn:    value > 0 ? 'border-red-800/60 text-red-400' : 'border-gray-800 text-gray-200',
-    info:    value > 0 ? 'border-yellow-800/60 text-yellow-400' : 'border-gray-800 text-gray-200',
+    default: 'border-line text-ink',
+    warn:    value > 0 ? 'border-danger text-danger' : 'border-line text-ink',
+    info:    value > 0 ? 'border-warn text-warn' : 'border-line text-ink',
   };
   return (
-    <div className={`bg-gray-900/60 border rounded-lg px-4 py-3 ${tones[tone]}`}>
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-gray-500">
+    <div className={`bg-surface border rounded-lg px-4 py-3 ${tones[tone]}`}>
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-ink-muted">
         <Icon size={12} /> {label}
       </div>
       <div className="text-2xl font-bold mt-1">{value}</div>
@@ -117,11 +117,11 @@ function RoleBadge({ role }) {
 }
 
 function AppChips({ list }) {
-  if (!list?.length) return <span className="text-gray-700">—</span>;
+  if (!list?.length) return <span className="text-ink-faint">—</span>;
   return (
     <div className="flex flex-wrap gap-1">
       {list.map((a, i) => (
-        <span key={i} className="text-[10px] px-1.5 py-0.5 bg-gray-800 text-gray-300 rounded whitespace-nowrap">
+        <span key={i} className="text-[10px] px-1.5 py-0.5 bg-raised text-ink rounded whitespace-nowrap">
           {a.appName}
         </span>
       ))}
@@ -163,7 +163,7 @@ export default function GlobalTab({ onAppsChanged }) {
   useEffect(() => { load(); }, [load]);
 
   if (loading && !data) {
-    return <div className="flex-1 flex items-center justify-center text-gray-600"><Loader2 className="animate-spin mr-2" size={16} /> <span className="text-xs">Construction du lineage global...</span></div>;
+    return <div className="flex-1 flex items-center justify-center text-ink-faint"><Loader2 className="animate-spin mr-2" size={16} /> <span className="text-xs">Construction du lineage global...</span></div>;
   }
 
   const problemCount = data ? data.orphans.length + data.multiProduced.length + data.duplicateExtractions.length : 0;
@@ -172,19 +172,19 @@ export default function GlobalTab({ onAppsChanged }) {
     <div className="h-full overflow-y-auto p-4 space-y-4">
       {/* Barre d'actions */}
       <div className="flex items-center gap-2">
-        <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-          <Globe size={15} className="text-emerald-400" /> Lineage global — toutes applications
+        <h3 className="text-sm font-semibold text-ink flex items-center gap-2">
+          <Globe size={15} className="text-accent-ink" /> Lineage global — toutes applications
         </h3>
         <div className="flex-1" />
         <button onClick={() => setShowImport(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white rounded">
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent hover:bg-accent text-white rounded">
           <Server size={12} /> Importer du serveur Qlik
         </button>
         <a href={globalApi.exportUrl()} download
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-200 rounded">
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-raised hover:bg-raised text-ink rounded">
           <Download size={12} /> CSV
         </a>
-        <button onClick={load} className="p-1.5 text-gray-500 hover:text-gray-200" title="Rafraîchir">
+        <button onClick={load} className="p-1.5 text-ink-muted hover:text-ink" title="Rafraîchir">
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
         </button>
         <button
@@ -198,12 +198,12 @@ export default function GlobalTab({ onAppsChanged }) {
               alert(e.error || e.message || 'Échec du reset');
             }
           }}
-          className="p-1.5 text-gray-600 hover:text-red-400" title="Réinitialiser la base locale (sauvegarde auto)">
+          className="p-1.5 text-ink-faint hover:text-danger" title="Réinitialiser la base locale (sauvegarde auto)">
           <Trash2 size={13} />
         </button>
       </div>
 
-      {error && <div className="text-xs text-red-400 bg-red-900/20 border border-red-800/40 rounded px-3 py-2">{error}</div>}
+      {error && <div className="text-xs text-danger bg-danger-soft border border-danger rounded px-3 py-2">{error}</div>}
 
       {data && (
         <>
@@ -218,7 +218,7 @@ export default function GlobalTab({ onAppsChanged }) {
           </div>
 
           {/* Sous-onglets */}
-          <div className="flex gap-1 border-b border-gray-800">
+          <div className="flex gap-1 border-b border-line">
             {[
               ['synthese', '📊 Synthèse'],
               ['qvds', `QVD (${data.qvds.length})`],
@@ -229,7 +229,7 @@ export default function GlobalTab({ onAppsChanged }) {
               ['gouvernance', '🛡 Gouvernance'],
             ].map(([id, label]) => (
               <button key={id} onClick={() => setView(id)}
-                className={`px-3 py-2 text-xs font-medium border-b-2 -mb-px ${view === id ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>
+                className={`px-3 py-2 text-xs font-medium border-b-2 -mb-px ${view === id ? 'border-accent text-accent-ink' : 'border-transparent text-ink-muted hover:text-ink'}`}>
                 {label}
               </button>
             ))}
@@ -266,27 +266,27 @@ export default function GlobalTab({ onAppsChanged }) {
               <>
                 <div className="flex items-center gap-2">
                   <select value={graphStream} onChange={e => { setGraphStream(e.target.value); setForceGraph(false); }}
-                    className="bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-xs text-gray-300">
+                    className="bg-surface border border-line rounded px-2 py-1.5 text-xs text-ink">
                     <option value="">Tous les streams ({data.graph.nodes.length} nœuds)</option>
                     {streams.map(st => <option key={st} value={st}>{st}</option>)}
                   </select>
-                  <span className="text-[10px] text-gray-600">{g.nodes.length} nœuds · {g.edges.length} liens</span>
+                  <span className="text-[10px] text-ink-faint">{g.nodes.length} nœuds · {g.edges.length} liens</span>
                 </div>
-                <div className="flex gap-4 text-[10px] text-gray-500">
-                  <span><span className="text-violet-400">■</span> App batch (génère des QVD)</span>
-                  <span><span className="text-yellow-400">■</span> App transform (lit + écrit)</span>
-                  <span><span className="text-emerald-400">■</span> App front (consomme)</span>
-                  <span><span className="text-red-400">◌</span> QVD orphelin</span>
-                  <span><span className="text-yellow-400">◌</span> QVD externe (producteur inconnu)</span>
+                <div className="flex gap-4 text-[10px] text-ink-muted">
+                  <span><span className="text-violet">■</span> App batch (génère des QVD)</span>
+                  <span><span className="text-warn">■</span> App transform (lit + écrit)</span>
+                  <span><span className="text-accent-ink">■</span> App front (consomme)</span>
+                  <span><span className="text-danger">◌</span> QVD orphelin</span>
+                  <span><span className="text-warn">◌</span> QVD externe (producteur inconnu)</span>
                 </div>
                 {tooBig ? (
-                  <div className="border border-gray-800 rounded-lg p-8 text-center space-y-3 bg-gray-950">
-                    <p className="text-xs text-gray-400">
+                  <div className="border border-line rounded-lg p-8 text-center space-y-3 bg-canvas">
+                    <p className="text-xs text-ink-muted">
                       ⚠ {g.nodes.length} nœuds — le rendu du graphe complet gèlerait l'interface.
-                      <br />Choisis un <span className="text-emerald-400">stream</span> ci-dessus pour un graphe lisible.
+                      <br />Choisis un <span className="text-accent-ink">stream</span> ci-dessus pour un graphe lisible.
                     </p>
                     <button onClick={() => setForceGraph(true)}
-                      className="text-[10px] px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded">
+                      className="text-[10px] px-3 py-1.5 bg-raised hover:bg-raised text-ink rounded">
                       Afficher quand même (peut être lent)
                     </button>
                   </div>
@@ -346,31 +346,31 @@ export default function GlobalTab({ onAppsChanged }) {
               <>
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="relative flex-1 max-w-xs min-w-[180px]">
-                    <Search size={12} className="absolute left-2.5 top-2 text-gray-600" />
+                    <Search size={12} className="absolute left-2.5 top-2 text-ink-faint" />
                     <input value={qvdSearch} onChange={e => setQvdSearch(e.target.value)}
                       placeholder="Chercher un QVD ou une app..."
-                      className="w-full bg-gray-900 border border-gray-800 rounded pl-8 pr-3 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-emerald-600" />
+                      className="w-full bg-surface border border-line rounded pl-8 pr-3 py-1.5 text-xs text-ink focus:outline-none focus:border-accent" />
                   </div>
                   <select value={qvdStatus} onChange={e => setQvdStatus(e.target.value)}
-                    className="bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-xs text-gray-300">
+                    className="bg-surface border border-line rounded px-2 py-1.5 text-xs text-ink">
                     <option value="">Tous statuts</option>
                     <option value="ok">ok</option>
                     <option value="orphelin">orphelin</option>
                     <option value="externe">externe</option>
                   </select>
                   <select value={qvdFolder} onChange={e => setQvdFolder(e.target.value)}
-                    className="bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-xs text-gray-300 max-w-[240px] truncate"
+                    className="bg-surface border border-line rounded px-2 py-1.5 text-xs text-ink max-w-[240px] truncate"
                     title={qvdFolder}>
                     <option value="">Tous dossiers ({folders.length})</option>
                     {folders.map(f => <option key={f} value={f}>{f}</option>)}
                   </select>
                   <select value={qvdStream} onChange={e => setQvdStream(e.target.value)}
-                    className="bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-xs text-gray-300">
+                    className="bg-surface border border-line rounded px-2 py-1.5 text-xs text-ink">
                     <option value="">Tous streams</option>
                     {streams.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                   <select value={qvdConsumers} onChange={e => setQvdConsumers(e.target.value)}
-                    className="bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-xs text-gray-300">
+                    className="bg-surface border border-line rounded px-2 py-1.5 text-xs text-ink">
                     <option value="">Nb conso.</option>
                     <option value="0">0 (orphelin)</option>
                     <option value="1">1</option>
@@ -378,22 +378,22 @@ export default function GlobalTab({ onAppsChanged }) {
                     <option value="5+">5+</option>
                   </select>
                   <select value={qvdSort} onChange={e => setQvdSort(e.target.value)}
-                    className="bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-xs text-gray-300">
+                    className="bg-surface border border-line rounded px-2 py-1.5 text-xs text-ink">
                     <option value="name">Trier: nom</option>
                     <option value="consumers">Trier: + consommé</option>
                     <option value="producers">Trier: + produit</option>
                   </select>
                   {hasActiveFilter && (
                     <button onClick={resetFilters}
-                      className="text-[10px] px-2 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded">
+                      className="text-[10px] px-2 py-1.5 bg-raised hover:bg-raised text-ink-muted rounded">
                       Reset
                     </button>
                   )}
-                  <span className="text-[10px] text-gray-600">{filteredQvds.length} QVD</span>
+                  <span className="text-[10px] text-ink-faint">{filteredQvds.length} QVD</span>
                 </div>
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-gray-950">
-                    <tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-800">
+                  <thead className="sticky top-0 bg-canvas">
+                    <tr className="text-left text-[10px] uppercase tracking-wider text-ink-muted border-b border-line">
                       <th className="py-2 pr-1 w-4"></th>
                       <th className="py-2 pr-3">QVD</th>
                       <th className="py-2 pr-3">Statut</th>
@@ -401,20 +401,20 @@ export default function GlobalTab({ onAppsChanged }) {
                       <th className="py-2 pr-3">Consommée par</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-800/50">
+                  <tbody className="divide-y divide-line">
                     {filteredQvds.map(x => (
                       <React.Fragment key={x.name}>
-                        <tr className="hover:bg-gray-900/40 cursor-pointer"
+                        <tr className="hover:bg-raised cursor-pointer"
                           onClick={() => setExpandedQvd(expandedQvd === x.name ? null : x.name)}>
-                          <td className="py-2 pr-1 text-gray-600">
+                          <td className="py-2 pr-1 text-ink-faint">
                             {expandedQvd === x.name ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                           </td>
-                          <td className="py-2 pr-3 font-mono text-cyan-300">{x.name}</td>
+                          <td className="py-2 pr-3 font-mono text-info">{x.name}</td>
                           <td className="py-2 pr-3">
                             <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                              x.status === 'orphelin' ? 'bg-red-900/40 text-red-400' :
-                              x.status === 'externe' ? 'bg-yellow-900/30 text-yellow-400' :
-                              'bg-emerald-900/30 text-emerald-400'}`}>
+                              x.status === 'orphelin' ? 'bg-danger-soft text-danger' :
+                              x.status === 'externe' ? 'bg-warn-soft text-warn' :
+                              'bg-accent-soft text-accent-ink'}`}>
                               {x.status}
                             </span>
                           </td>
@@ -422,36 +422,36 @@ export default function GlobalTab({ onAppsChanged }) {
                           <td className="py-2 pr-3"><AppChips list={x.consumers} /></td>
                         </tr>
                         {expandedQvd === x.name && (
-                          <tr className="bg-gray-900/30">
+                          <tr className="bg-surface">
                             <td></td>
                             <td colSpan={4} className="py-2.5 pr-3">
                               <div className="grid grid-cols-2 gap-4 text-[11px]">
                                 <div>
-                                  <div className="text-gray-500 uppercase text-[9px] tracking-wider mb-1">
+                                  <div className="text-ink-muted uppercase text-[9px] tracking-wider mb-1">
                                     💾 Générée par ({x.producers.length})
                                   </div>
                                   {x.producers.length ? x.producers.map((p, i) => (
                                     <div key={i} className="mb-1">
-                                      <span className="text-violet-300">{p.appName}</span>
-                                      {p.stream && <span className="text-gray-600"> · {p.stream}</span>}
-                                      <div className="text-gray-500">table <span className="font-mono text-gray-400">{p.tableName}</span></div>
-                                      {p.path && <div className="font-mono text-[10px] text-gray-600">{p.path}</div>}
+                                      <span className="text-violet">{p.appName}</span>
+                                      {p.stream && <span className="text-ink-faint"> · {p.stream}</span>}
+                                      <div className="text-ink-muted">table <span className="font-mono text-ink-muted">{p.tableName}</span></div>
+                                      {p.path && <div className="font-mono text-[10px] text-ink-faint">{p.path}</div>}
                                     </div>
-                                  )) : <span className="text-gray-600">producteur inconnu — app batch non importée ou source externe</span>}
+                                  )) : <span className="text-ink-faint">producteur inconnu — app batch non importée ou source externe</span>}
                                 </div>
                                 <div>
-                                  <div className="text-gray-500 uppercase text-[9px] tracking-wider mb-1">
+                                  <div className="text-ink-muted uppercase text-[9px] tracking-wider mb-1">
                                     📥 Consommée par ({x.consumers.length})
                                   </div>
                                   {x.consumers.length ? x.consumers.map((c, i) => (
                                     <div key={i} className="mb-1">
-                                      <span className="text-emerald-300">{c.appName}</span>
-                                      {c.stream && <span className="text-gray-600"> · {c.stream}</span>}
+                                      <span className="text-accent-ink">{c.appName}</span>
+                                      {c.stream && <span className="text-ink-faint"> · {c.stream}</span>}
                                       {c.tables?.length > 0 && (
-                                        <div className="text-gray-500">dans : <span className="font-mono text-gray-400">{c.tables.join(', ')}</span></div>
+                                        <div className="text-ink-muted">dans : <span className="font-mono text-ink-muted">{c.tables.join(', ')}</span></div>
                                       )}
                                     </div>
-                                  )) : <span className="text-gray-600">personne — candidat à la suppression</span>}
+                                  )) : <span className="text-ink-faint">personne — candidat à la suppression</span>}
                                 </div>
                               </div>
                             </td>
@@ -475,16 +475,16 @@ export default function GlobalTab({ onAppsChanged }) {
           {view === 'problemes' && (
             <div className="space-y-5">
               <section>
-                <h4 className="text-xs font-semibold text-red-400 mb-2 flex items-center gap-1.5">
+                <h4 className="text-xs font-semibold text-danger mb-2 flex items-center gap-1.5">
                   <FileWarning size={13} /> QVD orphelins ({data.orphans.length}) — générés mais jamais consommés
                 </h4>
-                {data.orphans.length === 0 ? <p className="text-xs text-gray-600">Aucun 🎉</p> : (
+                {data.orphans.length === 0 ? <p className="text-xs text-ink-faint">Aucun 🎉</p> : (
                   <div className="space-y-1.5">
                     {data.orphans.map(q => (
-                      <div key={q.name} className="text-xs bg-red-900/10 border border-red-900/30 rounded px-3 py-2">
-                        <span className="font-mono text-red-300">{q.name}</span>
-                        <span className="text-gray-500"> — écrit par {q.producers.map(p => p.appName).join(', ')}</span>
-                        {q.paths[0] && <div className="text-[10px] text-gray-600 font-mono mt-0.5">{q.paths[0]}</div>}
+                      <div key={q.name} className="text-xs bg-danger-soft border border-danger rounded px-3 py-2">
+                        <span className="font-mono text-danger">{q.name}</span>
+                        <span className="text-ink-muted"> — écrit par {q.producers.map(p => p.appName).join(', ')}</span>
+                        {q.paths[0] && <div className="text-[10px] text-ink-faint font-mono mt-0.5">{q.paths[0]}</div>}
                       </div>
                     ))}
                   </div>
@@ -492,15 +492,15 @@ export default function GlobalTab({ onAppsChanged }) {
               </section>
 
               <section>
-                <h4 className="text-xs font-semibold text-orange-400 mb-2 flex items-center gap-1.5">
+                <h4 className="text-xs font-semibold text-warn mb-2 flex items-center gap-1.5">
                   <CopyIcon size={13} /> Extractions dupliquées ({data.duplicateExtractions.length}) — même table SQL tirée par plusieurs apps
                 </h4>
-                {data.duplicateExtractions.length === 0 ? <p className="text-xs text-gray-600">Aucune 🎉</p> : (
+                {data.duplicateExtractions.length === 0 ? <p className="text-xs text-ink-faint">Aucune 🎉</p> : (
                   <div className="space-y-1.5">
                     {data.duplicateExtractions.map(d => (
-                      <div key={d.table} className="text-xs bg-orange-900/10 border border-orange-900/30 rounded px-3 py-2">
-                        <span className="font-mono text-orange-300">{d.table}</span>
-                        <span className="text-gray-500"> extraite par : </span>
+                      <div key={d.table} className="text-xs bg-warn-soft border border-warn rounded px-3 py-2">
+                        <span className="font-mono text-warn">{d.table}</span>
+                        <span className="text-ink-muted"> extraite par : </span>
                         <AppChips list={d.apps} />
                       </div>
                     ))}
@@ -509,15 +509,15 @@ export default function GlobalTab({ onAppsChanged }) {
               </section>
 
               <section>
-                <h4 className="text-xs font-semibold text-yellow-400 mb-2 flex items-center gap-1.5">
+                <h4 className="text-xs font-semibold text-warn mb-2 flex items-center gap-1.5">
                   <AlertTriangle size={13} /> QVD écrits par plusieurs apps ({data.multiProduced.length}) — risque d'écrasement
                 </h4>
-                {data.multiProduced.length === 0 ? <p className="text-xs text-gray-600">Aucun 🎉</p> : (
+                {data.multiProduced.length === 0 ? <p className="text-xs text-ink-faint">Aucun 🎉</p> : (
                   <div className="space-y-1.5">
                     {data.multiProduced.map(q => (
-                      <div key={q.name} className="text-xs bg-yellow-900/10 border border-yellow-900/30 rounded px-3 py-2">
-                        <span className="font-mono text-yellow-300">{q.name}</span>
-                        <span className="text-gray-500"> écrit par : </span>
+                      <div key={q.name} className="text-xs bg-warn-soft border border-warn rounded px-3 py-2">
+                        <span className="font-mono text-warn">{q.name}</span>
+                        <span className="text-ink-muted"> écrit par : </span>
                         <AppChips list={q.producers} />
                       </div>
                     ))}
@@ -526,14 +526,14 @@ export default function GlobalTab({ onAppsChanged }) {
               </section>
 
               <section>
-                <h4 className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1.5">
+                <h4 className="text-xs font-semibold text-ink-muted mb-2 flex items-center gap-1.5">
                   <Database size={13} /> QVD externes ({data.externals.length}) — consommés mais producteur non identifié
                 </h4>
-                <p className="text-[10px] text-gray-600 mb-2">Soit l'app batch qui les génère n'est pas encore importée, soit ils viennent d'un autre système.</p>
-                {data.externals.length === 0 ? <p className="text-xs text-gray-600">Aucun</p> : (
+                <p className="text-[10px] text-ink-faint mb-2">Soit l'app batch qui les génère n'est pas encore importée, soit ils viennent d'un autre système.</p>
+                {data.externals.length === 0 ? <p className="text-xs text-ink-faint">Aucun</p> : (
                   <div className="flex flex-wrap gap-1.5">
                     {data.externals.map(q => (
-                      <span key={q.name} className="text-[10px] font-mono px-2 py-1 bg-gray-900 border border-gray-800 rounded text-gray-400">{q.name}</span>
+                      <span key={q.name} className="text-[10px] font-mono px-2 py-1 bg-surface border border-line rounded text-ink-muted">{q.name}</span>
                     ))}
                   </div>
                 )}
@@ -562,35 +562,35 @@ export default function GlobalTab({ onAppsChanged }) {
               <>
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="relative flex-1 max-w-xs min-w-[180px]">
-                    <Search size={12} className="absolute left-2.5 top-2 text-gray-600" />
+                    <Search size={12} className="absolute left-2.5 top-2 text-ink-faint" />
                     <input value={appSearch} onChange={e => setAppSearch(e.target.value)}
                       placeholder="Chercher app ou propriétaire..."
-                      className="w-full bg-gray-900 border border-gray-800 rounded pl-8 pr-3 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-emerald-600" />
+                      className="w-full bg-surface border border-line rounded pl-8 pr-3 py-1.5 text-xs text-ink focus:outline-none focus:border-accent" />
                   </div>
                   <select value={appStream} onChange={e => setAppStream(e.target.value)}
-                    className="bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-xs text-gray-300">
+                    className="bg-surface border border-line rounded px-2 py-1.5 text-xs text-ink">
                     <option value="">Tous les streams</option>
                     {streams.map(st => <option key={st} value={st}>{st}</option>)}
                   </select>
                   <select value={appPublished} onChange={e => setAppPublished(e.target.value)}
-                    className="bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-xs text-gray-300">
+                    className="bg-surface border border-line rounded px-2 py-1.5 text-xs text-ink">
                     <option value="">Publiée ou non</option>
                     <option value="oui">Publiées</option>
                     <option value="non">Non publiées</option>
                   </select>
                   <select value={appRole} onChange={e => setAppRole(e.target.value)}
-                    className="bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-xs text-gray-300">
+                    className="bg-surface border border-line rounded px-2 py-1.5 text-xs text-ink">
                     <option value="">Tous rôles</option>
                     <option value="batch">batch</option>
                     <option value="transform">transform</option>
                     <option value="front">front</option>
                     <option value="autonome">autonome</option>
                   </select>
-                  <span className="text-[10px] text-gray-600">{filteredApps.length} app(s) — triées par orphelins produits</span>
+                  <span className="text-[10px] text-ink-faint">{filteredApps.length} app(s) — triées par orphelins produits</span>
                 </div>
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-gray-950">
-                    <tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-800">
+                  <thead className="sticky top-0 bg-canvas">
+                    <tr className="text-left text-[10px] uppercase tracking-wider text-ink-muted border-b border-line">
                       <th className="py-2 pr-3">Application</th>
                       <th className="py-2 pr-3">Stream</th>
                       <th className="py-2 pr-3">Publiée</th>
@@ -602,26 +602,26 @@ export default function GlobalTab({ onAppsChanged }) {
                       <th className="py-2 pr-3 text-right">QVD cons.</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-800/50">
+                  <tbody className="divide-y divide-line">
                     {filteredApps.map(a => (
                       <tr key={a.appId} className={!a.analyzed ? 'opacity-50' : ''}>
-                        <td className="py-2 pr-3 text-gray-200 max-w-[200px] truncate" title={a.appName}>{a.appName}</td>
-                        <td className="py-2 pr-3 text-gray-500">{a.stream || '—'}</td>
+                        <td className="py-2 pr-3 text-ink max-w-[200px] truncate" title={a.appName}>{a.appName}</td>
+                        <td className="py-2 pr-3 text-ink-muted">{a.stream || '—'}</td>
                         <td className="py-2 pr-3">
                           {a.published
-                            ? <span className="text-[9px] px-1.5 py-0.5 bg-emerald-900/30 text-emerald-400 rounded">publiée</span>
-                            : <span className="text-[9px] px-1.5 py-0.5 bg-gray-800 text-gray-500 rounded">privée</span>}
+                            ? <span className="text-[9px] px-1.5 py-0.5 bg-accent-soft text-accent-ink rounded">publiée</span>
+                            : <span className="text-[9px] px-1.5 py-0.5 bg-raised text-ink-muted rounded">privée</span>}
                         </td>
                         <td className="py-2 pr-3"><RoleBadge role={a.role} /></td>
-                        <td className="py-2 pr-3 text-gray-500 text-[10px] max-w-[130px] truncate" title={a.owner || ''}>{a.owner || '—'}</td>
-                        <td className="py-2 pr-3 text-gray-500 text-[10px]">
+                        <td className="py-2 pr-3 text-ink-muted text-[10px] max-w-[130px] truncate" title={a.owner || ''}>{a.owner || '—'}</td>
+                        <td className="py-2 pr-3 text-ink-muted text-[10px]">
                           {a.lastReload ? new Date(a.lastReload).toLocaleDateString('fr-FR') : '—'}
                         </td>
-                        <td className="py-2 pr-3 text-right font-mono text-violet-300">{a.producedQvds.length || '—'}</td>
-                        <td className={`py-2 pr-3 text-right font-mono ${a.orphansProduced > 0 ? 'text-red-400 font-bold' : 'text-gray-600'}`}>
+                        <td className="py-2 pr-3 text-right font-mono text-violet">{a.producedQvds.length || '—'}</td>
+                        <td className={`py-2 pr-3 text-right font-mono ${a.orphansProduced > 0 ? 'text-danger font-bold' : 'text-ink-faint'}`}>
                           {a.orphansProduced || '—'}
                         </td>
-                        <td className="py-2 pr-3 text-right font-mono text-emerald-300/80">{a.consumedQvds.length || '—'}</td>
+                        <td className="py-2 pr-3 text-right font-mono text-accent-ink">{a.consumedQvds.length || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
