@@ -2,7 +2,11 @@ const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 
-const dbPath = process.env.DATABASE_PATH || './data/lineage.db';
+// Chemin absolu par défaut (basé sur l'emplacement de ce fichier), pour que
+// Node trouve la même base peu importe le cwd : `node server/index.js` depuis
+// la racine et `cd server && node index.js` doivent lire le MÊME fichier.
+// DATABASE_PATH (env) écrase ce défaut, et reste la source de vérité en prod.
+const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', 'data', 'lineage.db');
 const dbDir = path.dirname(dbPath);
 
 if (!fs.existsSync(dbDir)) {
