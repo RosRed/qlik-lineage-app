@@ -223,6 +223,8 @@ const migrations = [
   'ALTER TABLE apps ADD COLUMN deleted_at DATETIME',
   'ALTER TABLE apps ADD COLUMN stale INTEGER DEFAULT 0',
   'ALTER TABLE apps ADD COLUMN last_synced_reload TEXT',
+  // Provider Git : "gitlab" (défaut) ou "github"
+  'ALTER TABLE git_config ADD COLUMN provider TEXT DEFAULT \'gitlab\'',
 ];
 for (const sql of migrations) {
   try { db.exec(sql); } catch (_) { /* colonne déjà présente */ }

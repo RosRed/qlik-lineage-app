@@ -162,7 +162,7 @@ export default function SettingsPage() {
 /* ── Section Config GitLab ───────────────────────────────────────────────── */
 
 function GitConfigSection() {
-  const [cfg, setCfg] = useState({ base_url: '', namespace: '', default_branch: 'main', has_token: false });
+  const [cfg, setCfg] = useState({ provider: 'gitlab', base_url: '', namespace: '', default_branch: 'main', has_token: false });
   const [token, setToken] = useState('');
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -208,26 +208,52 @@ function GitConfigSection() {
             <FolderGit2 size={18} />
           </div>
           <p className="text-xs text-ink-muted flex-1">
-            Chaque app Qlik synchronisée pousse ses sources (script, feuilles, mesures…) vers un repo gitlab
+            Chaque app Qlik synchronisée pousse ses sources (script, feuilles, mesures…) vers un repo
             dédié <code className="font-mono">{cfg.namespace || '<namespace>'}/&lt;slug-app&gt;</code>.
-            Le repo est créé automatiquement s'il n'existe pas.
+            Le repo est créé automatiquement s'il n'existe pas. Support <b>GitLab</b> et <b>GitHub</b>.
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="block text-[11px] font-medium text-ink-muted mb-1">Fournisseur</label>
+            <div className="flex gap-2">
+              {['gitlab', 'github'].map(p => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setCfg({
+                    ...cfg,
+                    provider: p,
+                    // Pré-remplir base URL par défaut pour chaque provider
+                    base_url: cfg.base_url || (p === 'github' ? 'https://github.com' : '')
+                  })}
+                  className={`px-3 py-1.5 rounded text-xs border ${
+                    (cfg.provider || 'gitlab') === p
+                      ? 'border-emerald-500 bg-emerald-900/20 text-emerald-300'
+                      : 'border-border bg-raised text-ink-muted hover:text-ink'
+                  }`}
+                >
+                  {p === 'gitlab' ? '🦊 GitLab' : '🐙 GitHub'}
+                </button>
+              ))}
+            </div>
+          </div>
           <div>
-            <label className="block text-[11px] font-medium text-ink-muted mb-1">Base URL GitLab</label>
+            <label className="block text-[11px] font-medium text-ink-muted mb-1">
+              Base URL {(cfg.provider || 'gitlab') === 'github' ? 'GitHub' : 'GitLab'}
+            </label>
             <input
               value={cfg.base_url} onChange={e => setCfg({ ...cfg, base_url: e.target.value })}
-              placeholder="https://gitlab.premium.local"
+              placeholder={(cfg.provider || 'gitlab') === 'github' ? 'https://github.com' : 'https://gitlab.premium.local'}
               className="w-full bg-raised border border-border rounded px-3 py-2 text-xs text-ink font-mono"
             />
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-ink-muted mb-1">Namespace (user ou group)</label>
+            <label className="block text-[11px] font-medium text-ink-muted mb-1">Namespace (user ou org)</label>
             <input
               value={cfg.namespace} onChange={e => setCfg({ ...cfg, namespace: e.target.value })}
-              placeholder="rrossamy"
+              placeholder={(cfg.provider || 'gitlab') === 'github' ? 'RosRed' : 'rrossamy'}
               className="w-full bg-raised border border-border rounded px-3 py-2 text-xs text-ink font-mono"
             />
           </div>
@@ -272,8 +298,13 @@ function GitConfigSection() {
         </div>
 
         <p className="text-[11px] text-ink-subtle">
-          Scopes du PAT requis : <code>api</code>, <code>read_repository</code>, <code>write_repository</code>.
-          Créer : User Settings → Access Tokens sur votre instance GitLab.
+          {(cfg.provider || 'gitlab') === 'github' ? (
+            <>Scopes du PAT GitHub requis : <code>repo</code> (full control of private repos).
+            Créer : <code>github.com/settings/tokens</code> → Generate new token (classic).</>
+          ) : (
+            <>Scopes du PAT GitLab requis : <code>api</code>, <code>read_repository</code>, <code>write_repository</code>.
+            Créer : User Settings → Access Tokens.</>
+          )}
         </p>
       </Card>
     </section>

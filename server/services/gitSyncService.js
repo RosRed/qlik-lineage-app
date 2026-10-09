@@ -39,11 +39,15 @@ function getConfig() {
   return db.prepare('SELECT * FROM git_config WHERE id = 1').get() || null;
 }
 
-/** URL de push avec token injecté pour auth HTTP basic : oauth2:<token>@host/... */
-function urlWithAuth(repoUrl, token) {
+/**
+ * URL de push avec token injecté pour auth HTTP :
+ *   GitLab : oauth2:<token>@gitlab.…
+ *   GitHub : x-access-token:<token>@github.com/…
+ */
+function urlWithAuth(repoUrl, token, provider) {
   try {
     const u = new URL(repoUrl);
-    u.username = 'oauth2';
+    u.username = provider === 'github' ? 'x-access-token' : 'oauth2';
     u.password = encodeURIComponent(token);
     return u.toString();
   } catch (_) {
@@ -59,7 +63,6 @@ async function ensureGitlabProject(config, slug, description) {
   const { base_url, namespace, access_token } = config;
   const projectPath = encodeURIComponent(`${namespace}/${slug}`);
 
-  // 1) Projet existe ?
   const headers = { 'PRIVATE-TOKEN': access_token };
   const existing = await fetch(`${base_url}/api/v4/projects/${projectPath}`, { headers });
   if (existing.ok) {
@@ -71,24 +74,17 @@ async function ensureGitlabProject(config, slug, description) {
     throw new Error(`GitLab API ${existing.status} : ${txt.slice(0, 200)}`);
   }
 
-  // 2) Création — le namespace est un user ou un group, GitLab accepte les deux par /namespaces/
   const nsRes = await fetch(`${base_url}/api/v4/namespaces/${encodeURIComponent(namespace)}`, { headers });
-  if (!nsRes.ok) {
-    throw new Error(`Namespace "${namespace}" introuvable sur GitLab (${nsRes.status})`);
-  }
+  if (!nsRes.ok) throw new Error(`Namespace "${namespace}" introuvable sur GitLab (${nsRes.status})`);
   const ns = await nsRes.json();
 
   const createRes = await fetch(`${base_url}/api/v4/projects`, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      name: slug,
-      path: slug,
-      namespace_id: ns.id,
+      name: slug, path: slug, namespace_id: ns.id,
       description: description || 'Export auto depuis Qlik Lineage',
-      visibility: 'private',
-      initialize_with_readme: false,
-      default_branch: 'main'
+      visibility: 'private', initialize_with_readme: false, default_branch: 'main'
     })
   });
   if (!createRes.ok) {
@@ -97,6 +93,71 @@ async function ensureGitlabProject(config, slug, description) {
   }
   const created = await createRes.json();
   return created.http_url_to_repo;
+}
+
+/**
+ * Appelle l'API GitHub pour vérifier/créer le repo <namespace>/<slug>.
+ * `namespace` est soit un user, soit une organisation — on détecte via /users et /orgs.
+ * Base URL par défaut : https://api.github.com (public). Pour GitHub Enterprise,
+ * passer base_url = https://github.enterprise.local (on dérive /api/v3).
+ */
+async function ensureGithubRepo(config, slug, description) {
+  const { base_url, namespace, access_token } = config;
+  const apiBase = base_url && base_url !== 'https://github.com'
+    ? `${base_url.replace(/\/$/, '')}/api/v3`
+    : 'https://api.github.com';
+
+  const headers = {
+    Authorization: `Bearer ${access_token}`,
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'qlik-lineage'
+  };
+
+  // 1) Repo existe ?
+  const existing = await fetch(`${apiBase}/repos/${namespace}/${slug}`, { headers });
+  if (existing.ok) {
+    const j = await existing.json();
+    return j.clone_url;
+  }
+  if (existing.status !== 404) {
+    const txt = await existing.text();
+    throw new Error(`GitHub API ${existing.status} : ${txt.slice(0, 200)}`);
+  }
+
+  // 2) Création : détecter si namespace = user authentifié ou organisation
+  let isOrg = false;
+  const orgRes = await fetch(`${apiBase}/orgs/${namespace}`, { headers });
+  if (orgRes.ok) isOrg = true;
+
+  const createUrl = isOrg
+    ? `${apiBase}/orgs/${namespace}/repos`
+    : `${apiBase}/user/repos`;
+
+  const createRes = await fetch(createUrl, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: slug,
+      description: description || 'Export auto depuis Qlik Lineage',
+      private: true,
+      auto_init: false,
+      default_branch: 'main'
+    })
+  });
+  if (!createRes.ok) {
+    const txt = await createRes.text();
+    throw new Error(`Création repo GitHub échouée (${createRes.status}) : ${txt.slice(0, 300)}`);
+  }
+  const created = await createRes.json();
+  return created.clone_url;
+}
+
+/** Dispatch vers le bon provider. */
+async function ensureProjectRepo(config, slug, description) {
+  if ((config.provider || 'gitlab') === 'github') {
+    return ensureGithubRepo(config, slug, description);
+  }
+  return ensureGitlabProject(config, slug, description);
 }
 
 /** Exécute une commande git dans un dossier. Collecte stdout + stderr. */
@@ -132,7 +193,7 @@ function buildCommitMessage(exportStats) {
  * Flow complet : init git si besoin, commit, push vers le repo gitlab de l'app.
  * Retourne { repoUrl, commitSha, pushed, nothingToCommit }.
  */
-async function syncAppDir(exportDir, repoUrl, token, branch, commitMessage, authorName, authorEmail) {
+async function syncAppDir(exportDir, repoUrl, token, provider, branch, commitMessage, authorName, authorEmail) {
   const envAuth = {
     GIT_TERMINAL_PROMPT: '0',  // jamais de prompt interactif
     GIT_ASKPASS: 'echo',
@@ -151,7 +212,7 @@ async function syncAppDir(exportDir, repoUrl, token, branch, commitMessage, auth
   }
 
   // Remote origin → crée ou met à jour avec URL authentifiée (token non logué).
-  const authedUrl = urlWithAuth(repoUrl, token);
+  const authedUrl = urlWithAuth(repoUrl, token, provider);
   try { await git(exportDir, ['remote', 'set-url', 'origin', authedUrl], envAuth); }
   catch (_) { await git(exportDir, ['remote', 'add', 'origin', authedUrl], envAuth); }
 
@@ -188,7 +249,7 @@ async function syncApp({ app, exportDir, exportStats, user }) {
   }
 
   const slug = slugify(app.name);
-  const repoUrl = await ensureGitlabProject(config, slug, `Export Qlik — ${app.name}`);
+  const repoUrl = await ensureProjectRepo(config, slug, `Export Qlik — ${app.name}`);
   const branch = config.default_branch || 'main';
   const message = buildCommitMessage(exportStats);
 
@@ -196,6 +257,7 @@ async function syncApp({ app, exportDir, exportStats, user }) {
     exportDir,
     repoUrl,
     config.access_token,
+    config.provider || 'gitlab',
     branch,
     message,
     user?.username || 'qlik-lineage',
