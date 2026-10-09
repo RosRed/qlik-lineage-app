@@ -6,6 +6,7 @@ const path = require('path');
 const { exportApp } = require('../services/gitoqlokExport');
 const { comparer, appliquer } = require('../services/gitoqlokImport');
 const { qrsRequest } = require('../lib/proxyClient');
+const { syncApp: syncAppToGit } = require('../services/gitSyncService');
 
 // GET /api/apps — avec indicateur d'analyse (pour les filtres de la sidebar)
 // Les apps soft-deleted (`deleted_at IS NOT NULL`) sont exclues par défaut ;
@@ -267,6 +268,33 @@ router.post('/:id/export/gitoqlok', async (req, res) => {
     res.json({ ...r, appName: app.name });
   } catch (e) {
     console.error('[Export Gitoqlok]', e);
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// POST /api/apps/:id/git/sync — export Gitoqlok + commit + push vers le repo gitlab de l'app
+// Création du repo à la volée (API GitLab) si absent. Config via /api/git/config.
+router.post('/:id/git/sync', async (req, res) => {
+  const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(req.params.id);
+  if (!app) return res.status(404).json({ error: 'Application non trouvée' });
+  if (!app.qlik_app_id) return res.status(400).json({ error: "Cette app n'est pas liée au serveur Qlik" });
+  const config = db.prepare('SELECT * FROM qlik_config WHERE id = 1').get();
+  if (!config || !config.host) return res.status(400).json({ error: 'Connexion Qlik non configurée' });
+
+  const outDir = dossierExport(app);
+  try {
+    // 1) Export frais
+    const exportResult = await exportApp(config, app.qlik_app_id, outDir);
+    // 2) Commit + push vers gitlab
+    const syncResult = await syncAppToGit({
+      app,
+      exportDir: outDir,
+      exportStats: exportResult?.stats || exportResult,
+      user: req.user
+    });
+    res.json({ export: exportResult, git: syncResult });
+  } catch (e) {
+    console.error('[Git sync]', e);
     res.status(502).json({ error: e.message });
   }
 });

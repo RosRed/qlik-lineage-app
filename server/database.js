@@ -53,6 +53,22 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS git_config (
+    id INTEGER PRIMARY KEY CHECK(id = 1),
+    base_url TEXT,
+    namespace TEXT,
+    access_token TEXT,
+    default_branch TEXT DEFAULT 'main',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS app_git_state (
+    app_id INTEGER PRIMARY KEY REFERENCES apps(id) ON DELETE CASCADE,
+    repo_url TEXT,
+    last_commit_sha TEXT,
+    last_sync_at DATETIME
+  );
+
   CREATE TABLE IF NOT EXISTS qlik_config (
     id INTEGER PRIMARY KEY CHECK(id = 1),
     host TEXT,

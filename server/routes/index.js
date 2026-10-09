@@ -16,6 +16,7 @@ router.use('/usage', require('./usage'));
 router.use('/qlik', require('./qlik'));
 router.use('/global', require('./global'));
 router.use('/ssis', require('./ssis'));
+router.use('/git', require('./git'));
 router.use('/admin', require('./admin'));
 
 module.exports = router;

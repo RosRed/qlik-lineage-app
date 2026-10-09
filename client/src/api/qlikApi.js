@@ -41,6 +41,14 @@ export const qlikApi = {
   trash:       ()     => fetch(`${BASE}/apps/trash`).then(json),
 };
 
+export const gitApi = {
+  getConfig:  ()      => fetch(`${BASE}/git/config`).then(json),
+  saveConfig: (cfg)   => post(`${BASE}/git/config`, cfg),
+  test:       ()      => post(`${BASE}/git/test`, {}),
+  status:     (appId) => fetch(`${BASE}/git/status/${appId}`).then(json),
+  syncApp:    (appId) => post(`${BASE}/apps/${appId}/git/sync`, {}),
+};
+
 export const globalApi = {
   getLineage:  (force) => force
     ? fetch(`${BASE}/global/lineage`).then(json).then(r => { cacheInvalidate(`${BASE}/global/lineage`); return r; })

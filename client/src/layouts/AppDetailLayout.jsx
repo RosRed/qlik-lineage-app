@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { Outlet, useParams, useOutletContext, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutGrid, Database, GitBranch, Network, MessageSquare, FileCode,
-  Zap, Brain, HardDrive, Loader2, ArrowLeft, Boxes, Clock, FolderGit2, Copy, GitPullRequestArrow
+  Zap, Brain, HardDrive, Loader2, ArrowLeft, Boxes, Clock, FolderGit2, Copy, GitPullRequestArrow, Upload
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { appsApi } from '../api/appsApi';
+import { gitApi } from '../api/qlikApi';
 import { useAppsList } from '../context/AppsContext';
 import { useAppWorkspace } from '../hooks/useAppWorkspace';
 import { PageHeader, SubTabs, Badge, EmptyState, Button, Spinner } from '../components/ui/primitives';
@@ -78,6 +79,7 @@ export default function AppDetailLayout() {
   const { apps, loading: loadingApps } = useAppsList();
   const workspace = useAppWorkspace(id);
   const [exporting, setExporting] = useState(false);
+  const [pushing, setPushing] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [showSync, setShowSync] = useState(false);
   const { script, analysis, analyzing, analyzeMode, setAnalyzeMode, saveAndAnalyze } = workspace;
@@ -167,6 +169,30 @@ ${r.outDir}`,
                   }
                 }}>
                 {exporting ? 'Export…' : 'Export Git'}
+              </Button>
+            )}
+            {app.qlik_app_id && (
+              <Button variant="ghost" icon={Upload} disabled={pushing}
+                title="Exporter + commit + push vers le repo gitlab dédié à cette app"
+                onClick={async () => {
+                  setPushing(true);
+                  try {
+                    const r = await gitApi.syncApp(app.id);
+                    if (r.git.nothingToCommit) {
+                      toast('Aucune modif à pousser (déjà à jour)', { icon: 'ℹ️' });
+                    } else {
+                      toast.success(
+                        `✅ Pushé : ${r.git.commitSha?.slice(0, 7)} sur ${r.git.repoUrl}`,
+                        { duration: 8000, style: { maxWidth: '560px', wordBreak: 'break-all' } }
+                      );
+                    }
+                  } catch (e) {
+                    toast.error(e.error || e.message || 'Échec du push Git');
+                  } finally {
+                    setPushing(false);
+                  }
+                }}>
+                {pushing ? 'Push…' : 'Push Git'}
               </Button>
             )}
             {/* Lien Apps → Tâches : jump vers /tasks préfiltré sur l'app courante */}

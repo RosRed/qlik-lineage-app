@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Sun, Moon, Trash2, RotateCcw, TrendingUp, Brain, Zap } from 'lucide-react';
+import { Settings, Sun, Moon, Trash2, RotateCcw, TrendingUp, Brain, Zap, FolderGit2, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { adminApi } from '../api/qlikApi';
+import { adminApi, gitApi } from '../api/qlikApi';
 import { useTheme } from '../context/ThemeContext';
 import { useAppsList } from '../context/AppsContext';
 import { PageHeader, PageBody, Card, Button } from '../components/ui/primitives';
@@ -151,9 +151,132 @@ export default function SettingsPage() {
             </Card>
           </section>
 
+          <GitConfigSection />
+
         </div>
       </PageBody>
     </>
+  );
+}
+
+/* ── Section Config GitLab ───────────────────────────────────────────────── */
+
+function GitConfigSection() {
+  const [cfg, setCfg] = useState({ base_url: '', namespace: '', default_branch: 'main', has_token: false });
+  const [token, setToken] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+
+  useEffect(() => {
+    gitApi.getConfig().then(r => { if (r) setCfg(r); }).catch(() => {});
+  }, []);
+
+  const save = async () => {
+    if (!cfg.base_url || !cfg.namespace) {
+      toast.error('base URL et namespace sont requis');
+      return;
+    }
+    setSaving(true);
+    try {
+      await gitApi.saveConfig({ ...cfg, access_token: token || undefined });
+      toast.success('Configuration Git sauvegardée');
+      setToken('');
+      const fresh = await gitApi.getConfig();
+      if (fresh) setCfg(fresh);
+    } catch (e) {
+      toast.error(e.error || e.message || 'Échec sauvegarde');
+    } finally { setSaving(false); }
+  };
+
+  const test = async () => {
+    setTesting(true); setTestResult(null);
+    try {
+      const r = await gitApi.test();
+      setTestResult({ ok: true, user: r.username, name: r.name });
+    } catch (e) {
+      setTestResult({ ok: false, error: e.error || e.message });
+    } finally { setTesting(false); }
+  };
+
+  return (
+    <section>
+      <h2 className="text-sm font-semibold text-ink-muted uppercase tracking-wide mb-2">Export Git (GitLab)</h2>
+      <Card className="p-4 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-lg bg-raised text-ink-muted">
+            <FolderGit2 size={18} />
+          </div>
+          <p className="text-xs text-ink-muted flex-1">
+            Chaque app Qlik synchronisée pousse ses sources (script, feuilles, mesures…) vers un repo gitlab
+            dédié <code className="font-mono">{cfg.namespace || '<namespace>'}/&lt;slug-app&gt;</code>.
+            Le repo est créé automatiquement s'il n'existe pas.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] font-medium text-ink-muted mb-1">Base URL GitLab</label>
+            <input
+              value={cfg.base_url} onChange={e => setCfg({ ...cfg, base_url: e.target.value })}
+              placeholder="https://gitlab.premium.local"
+              className="w-full bg-raised border border-border rounded px-3 py-2 text-xs text-ink font-mono"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-ink-muted mb-1">Namespace (user ou group)</label>
+            <input
+              value={cfg.namespace} onChange={e => setCfg({ ...cfg, namespace: e.target.value })}
+              placeholder="rrossamy"
+              className="w-full bg-raised border border-border rounded px-3 py-2 text-xs text-ink font-mono"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-ink-muted mb-1">Branche par défaut</label>
+            <input
+              value={cfg.default_branch || 'main'} onChange={e => setCfg({ ...cfg, default_branch: e.target.value })}
+              placeholder="main"
+              className="w-full bg-raised border border-border rounded px-3 py-2 text-xs text-ink font-mono"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-ink-muted mb-1">
+              Personal Access Token {cfg.has_token && <span className="text-emerald-500">(configuré)</span>}
+            </label>
+            <input
+              type="password" value={token} onChange={e => setToken(e.target.value)}
+              placeholder={cfg.has_token ? '•••••• (laisser vide pour conserver)' : 'glpat-...'}
+              className="w-full bg-raised border border-border rounded px-3 py-2 text-xs text-ink font-mono"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="primary" onClick={save} disabled={saving}>
+            {saving && <Loader2 className="animate-spin mr-1" size={12} />}
+            Sauvegarder
+          </Button>
+          <Button variant="secondary" onClick={test} disabled={testing || !cfg.has_token}>
+            {testing ? <Loader2 className="animate-spin mr-1" size={12} /> : null}
+            Tester la connexion
+          </Button>
+          {testResult && (
+            testResult.ok
+              ? <span className="text-[11px] text-emerald-400 inline-flex items-center gap-1">
+                  <CheckCircle2 size={12} /> Connecté en tant que <code>{testResult.user}</code> ({testResult.name})
+                </span>
+              : <span className="text-[11px] text-rose-400 inline-flex items-center gap-1">
+                  <XCircle size={12} /> {testResult.error}
+                </span>
+          )}
+        </div>
+
+        <p className="text-[11px] text-ink-subtle">
+          Scopes du PAT requis : <code>api</code>, <code>read_repository</code>, <code>write_repository</code>.
+          Créer : User Settings → Access Tokens sur votre instance GitLab.
+        </p>
+      </Card>
+    </section>
   );
 }
 
